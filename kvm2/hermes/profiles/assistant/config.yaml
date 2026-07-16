@@ -1,0 +1,100 @@
+# Hermes Profile — Assistant (Usage quotidien, remplace l'ancien main)
+# Clé : agent-assistant → modèles rapide + raisonnement
+# Base URL : http://127.0.0.1:4000/v1 (LiteLLM)
+
+model:
+  default: rapide
+  provider: litellm-assistant
+  base_url: http://127.0.0.1:4000/v1
+
+providers:
+  litellm-assistant:
+    api_key_env: LITELLM_KEY_AGENT_ASSISTANT
+    base_url: http://127.0.0.1:4000/v1
+
+fallback_providers: []
+credential_pool_strategies: {}
+
+toolsets:
+  - hermes-cli
+  - web
+  - terminal
+  - file
+  - delegation
+  - skills
+
+agent:
+  max_turns: 150
+  gateway_timeout: 1800
+  api_max_retries: 3
+  tool_use_enforcement: auto
+  task_completion_guidance: true
+  parallel_tool_call_guidance: true
+  environment_probe: true
+  environment_hint: "Profil Assistant — usage quotidien, veille, recherche"
+  coding_context: auto
+  verify_on_stop: auto
+  gateway_timeout_warning: 900
+  clarify_timeout: 600
+  gateway_notify_interval: 180
+  gateway_auto_continue_freshness: 3600
+  image_input_mode: auto
+  disabled_toolsets: []
+  verbose: false
+  reasoning_effort: medium
+
+terminal:
+  backend: local
+  timeout: 180
+  home_mode: auto
+  auto_source_bashrc: true
+  cwd: /root/agent-infra
+
+web:
+  backend: firecrawl
+
+browser:
+  inactivity_timeout: 120
+  command_timeout: 30
+  record_sessions: false
+  allow_private_urls: false
+  engine: auto
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  write_approval: false
+  memory_char_limit: 2200
+  user_char_limit: 1375
+  nudge_interval: 10
+  flush_min_turns: 6
+
+display:
+  compact: false
+  language: fr
+  platforms:
+    telegram:
+      streaming: true
+
+telegram:
+  allowed_chats: "8262789577"
+  extra:
+    rich_messages: true
+    rich_drafts: false
+
+gateway:
+  allowed_user_ids:
+    - "8262789577"
+
+platform_toolsets:
+  telegram:
+    - browser
+    - clarify
+    - delegation
+    - file
+    - memory
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - web

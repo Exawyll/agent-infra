@@ -9,15 +9,18 @@ Type=simple
 User=root
 WorkingDirectory=/root/.hermes
 EnvironmentFile=-/root/.hermes/.env
+ExecStartPre=/usr/local/bin/hermes serve --gateway-only --profile pro --daemonize
+ExecStartPre=/usr/local/bin/hermes serve --gateway-only --profile dev --daemonize
+ExecStartPre=/usr/local/bin/hermes serve --gateway-only --profile assistant --daemonize
+ExecStartPre=/usr/local/bin/hermes serve --gateway-only --profile veille --daemonize
 ExecStart=/usr/local/bin/hermes serve
 Restart=on-failure
 RestartSec=10
 TimeoutStopSec=30
 
-# Security hardening
+# Security hardening — assoupli pour accès aux profils
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=true
 ReadWritePaths=/root/.hermes /tmp
 
 [Install]

@@ -1,0 +1,68 @@
+# Hermes Profile — Veille (Filtrage & synthèse d'articles)
+# Clé : agent-veille → modèle rapide UNIQUEMENT
+# Base URL : http://127.0.0.1:4000/v1 (LiteLLM)
+# Points d'entrée :
+#   - Webhook local (appelé par n8n) → /webhook/veille
+#   - Gateway Telegram → questions manuelles + diffusion du digest
+# INTERDIT : aucun cron/tâche planifiée dans ce profil
+
+model:
+  default: rapide
+  provider: litellm-veille
+  base_url: http://127.0.0.1:4000/v1
+
+providers:
+  litellm-veille:
+    api_key_env: LITELLM_KEY_AGENT_VEILLE
+    base_url: http://127.0.0.1:4000/v1
+
+fallback_providers: []
+credential_pool_strategies: {}
+
+toolsets:
+  - web
+  - file
+
+agent:
+  max_turns: 50
+  gateway_timeout: 600
+  api_max_retries: 2
+  tool_use_enforcement: auto
+  task_completion_guidance: true
+  parallel_tool_call_guidance: true
+  environment_probe: true
+  environment_hint: "Profil Veille — extraction et synthèse d'articles uniquement"
+  image_input_mode: auto
+  disabled_toolsets: [terminal, delegation, skills, browser, clarify, todo, memory, session_search, cronjob, computer_use]
+  verbose: false
+  reasoning_effort: low
+
+terminal:
+  backend: local
+  timeout: 60
+  home_mode: auto
+  auto_source_bashrc: true
+
+web:
+  backend: firecrawl
+
+memory:
+  memory_enabled: false
+  user_profile_enabled: false
+
+display:
+  compact: true
+  language: fr
+  platforms:
+    telegram:
+      streaming: false
+
+telegram:
+  allowed_chats: "8262789577"
+  extra:
+    rich_messages: true
+    rich_drafts: false
+
+gateway:
+  allowed_user_ids:
+    - "8262789577"

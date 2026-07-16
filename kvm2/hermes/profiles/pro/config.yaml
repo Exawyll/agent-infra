@@ -1,0 +1,126 @@
+# Hermes Profile — Pro (Wylliam Professionnel)
+# Clé : agent-pro → modèles rapide + raisonnement
+# Base URL : http://127.0.0.1:4000/v1 (LiteLLM)
+# Isolation : aucune donnée partagée avec les autres profils
+
+model:
+  default: rapide
+  provider: litellm-pro
+  base_url: http://127.0.0.1:4000/v1
+
+providers:
+  litellm-pro:
+    api_key_env: LITELLM_KEY_AGENT_PRO
+    base_url: http://127.0.0.1:4000/v1
+
+fallback_providers: []
+credential_pool_strategies: {}
+
+toolsets:
+  - hermes-cli
+  - web
+  - terminal
+  - file
+  - delegation
+  - skills
+
+agent:
+  max_turns: 150
+  gateway_timeout: 1800
+  api_max_retries: 3
+  tool_use_enforcement: auto
+  task_completion_guidance: true
+  parallel_tool_call_guidance: true
+  environment_probe: true
+  environment_hint: "Profil professionnel — onepoint, Nexcer, Visma"
+  coding_context: auto
+  verify_on_stop: auto
+  gateway_timeout_warning: 900
+  clarify_timeout: 600
+  gateway_notify_interval: 180
+  gateway_auto_continue_freshness: 3600
+  image_input_mode: auto
+  disabled_toolsets: []
+  verbose: false
+  reasoning_effort: medium
+  personalities:
+    helpful: You are a helpful, friendly AI assistant.
+    concise: You are a concise assistant. Keep responses brief and to the point.
+    technical: You are a technical expert. Provide detailed, accurate technical information.
+    creative: You are a creative assistant. Think outside the box and offer innovative solutions.
+    teacher: You are a patient teacher. Explain concepts clearly with examples.
+
+terminal:
+  backend: local
+  timeout: 180
+  home_mode: auto
+  auto_source_bashrc: true
+  cwd: /root/agent-infra
+
+web:
+  backend: firecrawl
+
+browser:
+  inactivity_timeout: 120
+  command_timeout: 30
+  record_sessions: false
+  allow_private_urls: false
+  engine: auto
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  write_approval: false
+  memory_char_limit: 2200
+  user_char_limit: 1375
+  nudge_interval: 10
+  flush_min_turns: 6
+
+display:
+  compact: false
+  language: fr
+  platforms:
+    telegram:
+      streaming: true
+
+telegram:
+  allowed_chats: "8262789577"
+  extra:
+    rich_messages: true
+    rich_drafts: false
+
+gateway:
+  allowed_user_ids:
+    - "8262789577"
+
+moa:
+  default_preset: code-review
+  active_preset: code-review
+  presets:
+    code-review:
+      enabled: true
+      reference_models:
+        - provider: litellm-pro
+          model: raisonnement
+      aggregator:
+        provider: litellm-pro
+        model: review
+      reference_temperature: 0.6
+      aggregator_temperature: 0.4
+      reference_max_tokens: 800
+      max_tokens: 4096
+
+platform_toolsets:
+  telegram:
+    - browser
+    - clarify
+    - delegation
+    - file
+    - memory
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - web
+
+prefill_messages_file: /root/agent-infra/kvm2/hermes/profiles/pro/prefill.md

@@ -1,10 +1,11 @@
 # Hermes Profile — Veille
 # Provider: custom → LiteLLM
-# Modèle rapide UNIQUEMENT — clé virtuelle agent-veille
+# Modèle agent-veille (clé virtuelle LiteLLM)
 # api_key = clé veille (dans ~/.hermes/profiles/veille/config.yaml local)
+# Webhook déclenché par n8n — routes déclaratives, pas de subscriptions JSON
 
 model:
-  default: rapide
+  default: raisonnement
   provider: custom
   base_url: http://127.0.0.1:4000/v1
   api_key: PLACEHOLDER_REPLACE_LOCALLY
@@ -17,6 +18,7 @@ credential_pool_strategies: {}
 toolsets:
   - web
   - file
+  - skills
 
 agent:
   max_turns: 50
@@ -25,7 +27,6 @@ agent:
   disabled_toolsets:
     - terminal
     - delegation
-    - skills
     - browser
     - clarify
     - todo
@@ -57,3 +58,89 @@ telegram:
 gateway:
   allowed_user_ids:
     - "8262789577"
+
+# ─── Webhooks n8n → Hermes ───────────────────────────────────────────
+# n8n Schedule Trigger → HTTP Request vers ces webhooks → Hermes met en
+# forme ET publie sur Telegram. n8n ne diffuse rien.
+# Bind: Tailscale KVM2 (100.106.174.46), jamais 0.0.0.0.
+# HMAC + signature obligatoires (secret dans SOPS).
+platforms:
+  webhook:
+    enabled: true
+    extra:
+      host: "100.106.174.46"
+      port: 8644
+      secret: PLACEHOLDER_WEBHOOK_SECRET_SOPS
+      routes:
+        # ── Newsletter Gaming (modèle: raisonnement, skill: gaming-newsletter) ──
+        newsletter-gaming:
+          prompt: |
+            Génère la newsletter gaming des 15 DERNIERS JOURS (période glissante). Suis le skill `gaming-newsletter` à la lettre pour la newsletter (3 sections, seuils, cross-vérification, format Telegram, déduplication, logging).
+
+            **IMPORTANT — RIGUEUR DES SOURCES** : avant d'inclure une information majeure (rachat, fermeture, annonce politique industrielle), vérifie-la sur 2 sources indépendantes minimum. Ne relaye jamais une info non sourcée.
+
+            **RÈGLE SUPPLÉMENTAIRE — Hitlist Game Pass MC > 80 (sous-marin)**
+            Après avoir livré la newsletter, exécute cette étape supplémentaire en coulisse :
+
+            1. Depuis les données collectées pour la Section 3 (nouveautés Game Pass de la quinzaine), isole celles avec **Metacritic > 80** (pas > 70 comme le tableau, mais > 80).
+            2. Si au moins un jeu correspond, **ajoute-le à la fin** du fichier `~/.hermes/gaming_gamepass_hitlist.md` au format :
+               ```
+               | JJ/MM | Nom du Jeu | Note | Genre | Pourquoi y jouer |
+               ```
+               L'en-tête existe déjà, ne pas la recréer.
+            3. Si le fichier n'existe pas, crée-le avec l'en-tête :
+               ```
+               # 🎮 Ma Hitlist Game Pass (MC > 80)
+
+               _Mise à jour : <date du jour>_
+
+               | Ajouté le | Jeu | Note MC | Genre | Pourquoi y jouer |
+               |-----------|-----|---------|-------|------------------|
+               ```
+            4. Si aucun jeu de la quinzaine n'a MC > 80, ne touche pas au fichier (pas de modification).
+            5. Important : ne PAS inclure de jeux qui étaient déjà notés MC 71-79 dans le tableau Section 3 — le seuil de la hitlist est strictement > 80.
+
+            **Rappel** : Le fichier hitlist est indépendant de la newsletter. La newsletter conserve son seuil MC > 70 pour la Section 3 inchangé.
+          skills:
+            - gaming-newsletter
+          deliver: telegram
+          deliver_extra:
+            chat_id: "8262789577"
+
+        # ── Factfulness Daily (modèle: raisonnement) ──
+        factfulness-daily:
+          prompt: |
+            Tu es un agrégateur d'actualités inspiré par **Hans Rosling et Factfulness** — tu cherches les faits, les chiffres, et les tendances qui montrent que le monde va mieux qu'on ne le croit.
+
+            ## 📋 IMPORTANT : Déduplication avec un fichier de suivi
+
+            Avant de chercher des news, lis le fichier `/root/.hermes/factfulness_log.json` via `read_file(path='/root/.hermes/factfulness_log.json')`. Tu y trouveras la liste des sujets déjà envoyés les jours précédents.
+
+            ### Règles :
+            1. **Choisis 3 à 5 news positives** (progrès scientifique, santé, environnement, pauvreté, éducation, etc.)
+            2. **Compare chaque news avec le log** — si le sujet principal (titre ou angle) est déjà dans le log, **saute-le**. Ne répète jamais un sujet déjà couvert.
+            3. **Présente les news** de façon chill et optimiste, avec des chiffres concrets quand possible.
+            4. **À la fin de ton message**, mentionne brièvement que tu évites les redites grâce au suivi.
+
+            ### Format de présentation :
+            - Utilise des émojis et du Markdown Telegram (gras, listes)
+            - Chaque news : un titre court en gras, puis 2-3 lignes de contenu avec chiffres
+            - Termine par un petit mot positif ou une citation inspirante
+
+            Exemple :
+            ```
+            🌍 Bonne nouvelle du matin !
+
+            **💉 50M d'enfants vaccinés en 2025** — Un nouveau record...
+            ...
+            ```
+
+            ### Après avoir envoyé les news :
+            Avant de terminer, mets à jour le fichier via la fonction `write_file(path='/root/.hermes/factfulness_log.json', content=...)` :
+            1. Ajoute un objet pour chaque news envoyée aujourd'hui : `{"date": "2026-07-10", "title": "Titre de la news", "topic": "mot-clé du sujet"}`
+            2. Conserve TOUT l'historique précédent (ne l'écrase pas)
+            3. Mets à jour `last_updated` avec la date du jour
+            4. Garde un maximum de 365 entrées (nettoie les plus vieilles si nécessaire)
+          deliver: telegram
+          deliver_extra:
+            chat_id: "8262789577"

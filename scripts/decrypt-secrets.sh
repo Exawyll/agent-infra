@@ -31,6 +31,7 @@ if [ ! -f "$HOME/.age/key.txt" ]; then
 fi
 
 echo "🔓 Decrypting ${SECRETS_FILE} → ${OUTPUT}..."
+export SOPS_AGE_KEY_FILE="$HOME/.age/key.txt"
 sops --decrypt "$SECRETS_FILE" > "$OUTPUT"
 chmod 600 "$OUTPUT"
 echo "✅ Secrets decrypted to ${OUTPUT}"

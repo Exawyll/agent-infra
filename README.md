@@ -2,7 +2,7 @@
 
 Infrastructure reproductible pour KVM2 (le cerveau) : n8n + Hermes + LiteLLM.
 
-> **Statut :** ⚠️ NON FIABLE — Test de restauration à valider (Phase 2)
+> **Statut :** ✅ FIABLE — Test de restauration validé sur KVM1 (16/07/2026)
 
 ## Architecture
 
@@ -37,6 +37,7 @@ Infrastructure reproductible pour KVM2 (le cerveau) : n8n + Hermes + LiteLLM.
 |---|---|
 | Password manager | `AGE-SECRET-KEY-1N8KV...` |
 | `~/.age/key.txt` | Clé restaurée par `restore.sh` |
+| `SOPS_AGE_KEY_FILE` | `export SOPS_AGE_KEY_FILE=~/.age/key.txt` (automatique dans les scripts) |
 | GitHub | Ce repo (agent-infra) |
 
 Sans la clé AGE : impossible de déchiffrer `secrets/.env.enc.env` → impossible de redéployer.

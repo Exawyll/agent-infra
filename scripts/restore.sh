@@ -45,6 +45,7 @@ echo "🔑 Restoring AGE private key..."
 mkdir -p ~/.age
 cp "$AGE_KEY" ~/.age/key.txt
 chmod 600 ~/.age/key.txt
+export SOPS_AGE_KEY_FILE="$HOME/.age/key.txt"
 echo "✅ AGE key restored"
 
 # 5. Déployer la stack

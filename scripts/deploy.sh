@@ -19,6 +19,7 @@ decrypt_secrets() {
     exit 1
   fi
   echo "🔓 Decrypting secrets..."
+  export SOPS_AGE_KEY_FILE="$HOME/.age/key.txt"
   sops --decrypt "${SECRETS_DIR}/.env.enc.env" > "${REPO_ROOT}/.env"
   echo "✅ Secrets decrypted to .env"
 }

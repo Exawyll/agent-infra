@@ -23,6 +23,41 @@ services:
       - traefik_data:/letsencrypt
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
+  litellm:
+    image: ghcr.io/berriai/litellm:main-v1.55.0
+    restart: always
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.litellm.rule=Host(`${LITELLM_SUBDOMAIN}.${DOMAIN_NAME}`)
+      - traefik.http.routers.litellm.tls=true
+      - traefik.http.routers.litellm.entrypoints=web,websecure
+      - traefik.http.routers.litellm.tls.certresolver=mytlschallenge
+      - traefik.http.services.litellm.loadbalancer.server.port=4000
+    environment:
+      - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD}@litellm-postgres:5432/litellm
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+    volumes:
+      - litellm_configs:/app/db
+      - ./litellm-config.yaml:/app/config.yaml:ro
+    command:
+      - "--config=/app/config.yaml"
+      - "--port=4000"
+
+  litellm-postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: litellm
+    volumes:
+      - litellm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   n8n:
     image: docker.n8n.io/n8nio/n8n:2.30.5
     restart: always
@@ -77,3 +112,5 @@ volumes:
   n8n_data:
     external: true
     name: n8n_data
+  litellm_configs:
+  litellm_postgres_data:

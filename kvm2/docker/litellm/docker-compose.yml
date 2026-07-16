@@ -1,20 +1,39 @@
 version: "3.7"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: litellm
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   litellm:
     image: ghcr.io/berriai/litellm:main-v1.55.0
     restart: always
     ports:
       - "127.0.0.1:4000:4000"
     environment:
-      - DATABASE_URL=sqlite:///app/db/litellm.db
+      - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD}@postgres:5432/litellm
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
     volumes:
-      - litellm_data:/app/db
+      - litellm_configs:/app/db
       - ./config.yaml:/app/config.yaml:ro
     command:
       - "--config=/app/config.yaml"
       - "--port=4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
-  litellm_data:
+  postgres_data:
+  litellm_configs:

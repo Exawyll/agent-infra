@@ -1,5 +1,8 @@
 # agent-infra — .gitignore
 
+# Decrypted secrets (from SOPS)
+.env
+
 # Age private key (stored OFFLINE only)
 secrets/key.txt
 .age/

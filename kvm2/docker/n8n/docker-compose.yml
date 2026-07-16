@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
   traefik:
-    image: "traefik:v3.3"
+    image: "traefik:v3.7.8"
     restart: always
     command:
       - "--api=true"
@@ -65,6 +65,10 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
       - /local-files:/files
+
+networks:
+  default:
+    name: n8n_default
 
 volumes:
   traefik_data:

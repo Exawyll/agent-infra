@@ -44,10 +44,6 @@ litellm_settings:
   set_verbose: false
   num_retries: 2
   request_timeout: 600
-  cache: true
-  cache_params:
-    type: s2
-    mode: default
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

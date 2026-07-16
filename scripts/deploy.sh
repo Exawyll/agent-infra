@@ -119,10 +119,21 @@ deploy_hermes() {
 
       [ ! -f "$src_config" ] && continue
 
-      if [ ! -f "$dst_config" ]; then
-        mkdir -p "$(dirname "$dst_config")"
-        cp "$src_config" "$dst_config"
-        echo "  📄 Created ${profile_name}/config.yaml from repo template"
+      # Preserve existing api_key (per-machine) before overwriting
+      local existing_key=""
+      if [ -f "$dst_config" ]; then
+        existing_key=$(grep '^  api_key:' "$dst_config" | head -1 | sed 's/^  api_key: //' || true)
+      fi
+
+      mkdir -p "$(dirname "$dst_config")"
+      cp "$src_config" "$dst_config"
+
+      # Restore api_key placeholder if we had a real key
+      if [ -n "$existing_key" ]; then
+        sed -i "s|PLACEHOLDER_REPLACE_LOCALLY|${existing_key}|" "$dst_config"
+        echo "  🔑 ${profile_name}/config.yaml: api_key preserved"
+      else
+        echo "  📄 ${profile_name}/config.yaml: created from repo template"
       fi
 
       if [ -n "$webhook_secret" ] && grep -q "PLACEHOLDER_WEBHOOK_SECRET_SOPS" "$dst_config" 2>/dev/null; then
@@ -140,8 +151,8 @@ deploy_hermes() {
     echo "  📚 Veille skills deployed"
   fi
 
-  echo "🔧 Installing Hermes systemd service..."
-  bash "${REPO_ROOT}/kvm2/hermes/install.sh" systemd
+  echo "🔧 Installing Hermes gateway service (veille)..."
+  yes | hermes --profile veille gateway install 2>&1 | tail -3
   echo "✅ Hermes deployed"
 
   # Cleanup .env immediately — hermes is the last consumer in a chain.

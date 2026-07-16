@@ -60,8 +60,67 @@ deploy_litellm() {
 }
 
 deploy_hermes() {
-  echo "🚀 Deploying Hermes systemd service..."
+  echo "🚀 Deploying Hermes profiles + webhook secrets..."
+
+  # Ensure secrets are decrypted
+  if [ ! -f "${REPO_ROOT}/.env" ]; then
+    if [ -f "${SECRETS_DIR}/.env.enc.env" ]; then
+      decrypt_secrets
+    fi
+  fi
+
+  # Extract webhook secret from SOPS (if available)
+  local webhook_secret=""
+  if [ -f "${REPO_ROOT}/.env" ]; then
+    webhook_secret=$(grep WEBHOOK_SECRET "${REPO_ROOT}/.env" | cut -d= -f2 || true)
+  fi
+
+  # Deploy profile configs from repo → ~/.hermes/profiles/
+  # Only replace SOPS-managed placeholders — never touch api_key (per-machine).
+  local hermes_profiles="${HOME}/.hermes/profiles"
+  local repo_profiles="${REPO_ROOT}/kvm2/hermes/profiles"
+
+  if [ -d "$repo_profiles" ]; then
+    for profile_dir in "$repo_profiles"/*/; do
+      local profile_name
+      profile_name=$(basename "$profile_dir")
+      local src_config="${profile_dir}config.yaml"
+      local dst_config="${hermes_profiles}/${profile_name}/config.yaml"
+
+      if [ ! -f "$src_config" ]; then
+        continue
+      fi
+
+      # First deploy: copy the template
+      if [ ! -f "$dst_config" ]; then
+        mkdir -p "$(dirname "$dst_config")"
+        cp "$src_config" "$dst_config"
+        echo "  📄 Created ${profile_name}/config.yaml from repo template"
+      fi
+
+      # Inject SOPS-managed secrets into the deployed config (idempotent)
+      if [ -n "$webhook_secret" ]; then
+        if grep -q "PLACEHOLDER_WEBHOOK_SECRET_SOPS" "$dst_config" 2>/dev/null; then
+          sed -i "s|PLACEHOLDER_WEBHOOK_SECRET_SOPS|${webhook_secret}|" "$dst_config"
+          echo "  🔐 WEBHOOK_SECRET injected in ${profile_name}/config.yaml"
+        fi
+      fi
+    done
+  fi
+
+  # Copy skills for the veille profile
+  local veille_skills_src="${repo_profiles}/veille/skills"
+  local veille_skills_dst="${hermes_profiles}/veille/skills"
+  if [ -d "$veille_skills_src" ]; then
+    mkdir -p "$veille_skills_dst"
+    cp -r "$veille_skills_src"/* "$veille_skills_dst/"
+    echo "  📚 Veille skills deployed"
+  fi
+
+  # Install/restart systemd service
+  echo "🔧 Installing Hermes systemd service..."
   bash "${REPO_ROOT}/kvm2/hermes/install.sh" systemd
+  echo "✅ Hermes deployed"
 }
 
 # === MAIN ===

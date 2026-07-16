@@ -5,7 +5,7 @@
 # Webhook déclenché par n8n — routes déclaratives, pas de subscriptions JSON
 
 model:
-  default: raisonnement
+  default: rapide
   provider: custom
   base_url: http://127.0.0.1:4000/v1
   api_key: PLACEHOLDER_REPLACE_LOCALLY
@@ -72,7 +72,7 @@ platforms:
       port: 8644
       secret: PLACEHOLDER_WEBHOOK_SECRET_SOPS
       routes:
-        # ── Newsletter Gaming (modèle: raisonnement, skill: gaming-newsletter) ──
+        # ── Newsletter Gaming (model via webhook adapter: non supporté → profil default rapide) ──
         newsletter-gaming:
           prompt: |
             Génère la newsletter gaming des 15 DERNIERS JOURS (période glissante). Suis le skill `gaming-newsletter` à la lettre pour la newsletter (3 sections, seuils, cross-vérification, format Telegram, déduplication, logging).
@@ -107,7 +107,7 @@ platforms:
           deliver_extra:
             chat_id: "8262789577"
 
-        # ── Factfulness Daily (modèle: raisonnement) ──
+        # ── Factfulness Daily ──
         factfulness-daily:
           prompt: |
             Tu es un agrégateur d'actualités inspiré par **Hans Rosling et Factfulness** — tu cherches les faits, les chiffres, et les tendances qui montrent que le monde va mieux qu'on ne le croit.

@@ -26,16 +26,12 @@ services:
   litellm:
     image: ghcr.io/berriai/litellm:main-v1.55.0
     restart: always
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.litellm.rule=Host(`${LITELLM_SUBDOMAIN}.${DOMAIN_NAME}`)
-      - traefik.http.routers.litellm.tls=true
-      - traefik.http.routers.litellm.entrypoints=web,websecure
-      - traefik.http.routers.litellm.tls.certresolver=mytlschallenge
-      - traefik.http.services.litellm.loadbalancer.server.port=4000
+    ports:
+      - "127.0.0.1:4000:4000"
     environment:
       - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD}@litellm-postgres:5432/litellm
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     volumes:
       - litellm_configs:/app/db
       - ./litellm-config.yaml:/app/config.yaml:ro

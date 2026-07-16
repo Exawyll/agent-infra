@@ -1,24 +1,36 @@
-# LiteLLM Proxy Config
-# ⚠️  Ce fichier est un SQUELETTE — à remplir quand LiteLLM sera installé
-# Voir le plan Notion : Configuration LiteLLM — pas-à-pas
+# LiteLLM Proxy Config — 4 alias : rapide, code, review, raisonnement
+# Toute modification → restart du conteneur LiteLLM
 
 model_list:
+  # Tâches simples : veille, questions rapides
   - model_name: rapide
     litellm_params:
       model: openrouter/deepseek/deepseek-chat
       api_key: os.environ/OPENROUTER_API_KEY
+
+  # Génération de code (daemon dev)
   - model_name: code
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
       api_key: os.environ/OPENROUTER_API_KEY
+
+  # Review de code + consolidation (triple review via n8n, alias direct Opus)
+  - model_name: review
+    litellm_params:
+      model: openrouter/anthropic/claude-opus-4
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # Raisonnement complexe : planification, architecture
   - model_name: raisonnement
     litellm_params:
-      model: openrouter/deepseek/deepseek-reasoner
+      model: openrouter/deepseek/deepseek-r1-0528
       api_key: os.environ/OPENROUTER_API_KEY
 
 litellm_settings:
   drop_params: true
-  set_verbose: true
+  set_verbose: false
+  num_retries: 2
+  request_timeout: 600
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

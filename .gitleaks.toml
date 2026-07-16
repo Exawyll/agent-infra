@@ -1,0 +1,10 @@
+# Gitleaks configuration — agent-infra
+title = "agent-infra gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+paths = [
+  '''(.*)?secrets/.*\.enc\.env$''',
+]

@@ -1,0 +1,48 @@
+{
+  "updatedAt": "2026-04-02T12:46:24.000Z",
+  "createdAt": "2026-04-02T12:45:39.722Z",
+  "id": "RAOE3Ky5tRuU0qOx",
+  "name": "My workflow 4",
+  "description": null,
+  "active": false,
+  "isArchived": true,
+  "nodes": [],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "f0125358-2d0a-4ba5-bc90-13d9b34c7c97",
+  "activeVersionId": null,
+  "versionCounter": 4,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-04-02T12:45:39.729Z",
+      "createdAt": "2026-04-02T12:45:39.729Z",
+      "role": "workflow:owner",
+      "workflowId": "RAOE3Ky5tRuU0qOx",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

@@ -1,0 +1,257 @@
+{
+  "updatedAt": "2026-06-11T15:52:28.609Z",
+  "createdAt": "2026-06-11T15:40:11.307Z",
+  "id": "orOm7tKGjGFDEttN",
+  "name": "Relance items GTD en retard",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "07cb26b0-be4f-4b7f-b143-89fc8fbdc8a9",
+      "name": "Lundi 8h00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -300,
+        -400
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8a713bf6-3b95-46b3-92dd-fce60c311893",
+      "name": "Query Notion Inbox",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -80,
+        -400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/6b279b50-1f54-4b57-b96d-919c5f667730/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"filter\":{\"property\":\"Trait\u00e9\",\"checkbox\":{\"equals\":false}},\"page_size\":100}",
+        "options": {}
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "id": "682c3034-7da4-4b18-9120-8d5d6e5d5cfb",
+      "name": "Filtrer et formater",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -400
+      ],
+      "parameters": {
+        "jsCode": "const results = $input.item.json.results || [];\nconst now = new Date();\nconst sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\n\nconst overdue = results.filter(function(page) {\n  const props = page.properties;\n  if (!props) return false;\n  const action = props['Action'] && props['Action'].select ? props['Action'].select.name : '';\n  const traite = props['Trait\u00e9'] ? props['Trait\u00e9'].checkbox : false;\n  const dateCapture = new Date(props['Date Capture'] ? props['Date Capture'].created_time : page.created_time);\n  return action === '\\u27A1\\uFE0F Faire' && !traite && dateCapture < sevenDaysAgo;\n});\n\nif (overdue.length === 0) {\n  return [{ json: { count: 0, lines: 'Aucun item en retard cette semaine.' } }];\n}\n\nconst lines = overdue.map(function(page) {\n  const props = page.properties;\n  const titre = props['Capture'] && props['Capture'].title ? props['Capture'].title.map(function(t) { return t.plain_text; }).join('') : 'Sans titre';\n  const dateCapture = new Date(props['Date Capture'] ? props['Date Capture'].created_time : page.created_time);\n  const ageDays = Math.floor((now - dateCapture) / (1000 * 60 * 60 * 24));\n  return '\u2022 ' + titre + ' (J+' + ageDays + ')';\n});\n\nconst dateStr = now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });\nconst summary = dateStr + ' \\u2014 ' + overdue.length + ' action(s) Faire en attente depuis +7j :\\n\\n' + lines.join('\\n');\n\nreturn [{ json: { count: overdue.length, lines: summary } }];"
+      }
+    },
+    {
+      "id": "502dfd49-390f-4c87-82cf-781a7bb493e2",
+      "name": "Items en retard ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        400,
+        -400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "count-check",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "374056f6-3ab5-44dd-968b-f23c0a9f3f3b",
+      "name": "Cr\u00e9er entr\u00e9e Relance",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        640,
+        -320
+      ],
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "6b279b50-1f54-4b57-b96d-919c5f667730",
+          "mode": "list",
+          "cachedResultName": "\ud83d\udce5 Inbox GTD"
+        },
+        "title": "=\ud83d\udcec Relance hebdo \u2014 {{ $json.count }} items Faire en attente",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Source|select",
+              "selectValue": "\ud83d\udd00 Autre"
+            },
+            {
+              "key": "Action|select",
+              "selectValue": "\u27a1\ufe0f Faire"
+            },
+            {
+              "key": "Notes|rich_text",
+              "textContent": "={{ $json.lines }}"
+            },
+            {
+              "key": "Confiance|select",
+              "selectValue": "\u2705 Certain"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Lundi 8h00": {
+      "main": [
+        [
+          {
+            "node": "Query Notion Inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Notion Inbox": {
+      "main": [
+        [
+          {
+            "node": "Filtrer et formater",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrer et formater": {
+      "main": [
+        [
+          {
+            "node": "Items en retard ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Items en retard ?": {
+      "main": [
+        [
+          {
+            "node": "Cr\u00e9er entr\u00e9e Relance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "node:Lundi 8h00": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "aiBuilderAssisted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "333eadd1-21bf-4483-a14d-23edad2cdcc3",
+  "activeVersionId": null,
+  "versionCounter": 14,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-06-11T15:40:11.308Z",
+      "createdAt": "2026-06-11T15:40:11.308Z",
+      "role": "workflow:owner",
+      "workflowId": "orOm7tKGjGFDEttN",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

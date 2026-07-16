@@ -1,0 +1,403 @@
+{
+  "updatedAt": "2026-05-01T07:49:17.000Z",
+  "createdAt": "2025-08-17T11:56:28.854Z",
+  "id": "GW5RXz4KWJgZ9UpX",
+  "name": "completely clean and reorganize your mailbox",
+  "description": null,
+  "active": false,
+  "isArchived": true,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b31da066-42ac-4d02-8efa-f073bfd5aeac",
+      "name": "Manual Trigger - START CLEANUP",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configuration and safety settings\nconst config = {\n  // SAFETY SETTINGS\n  dryRun: false, // SET TO FALSE TO ACTUALLY DELETE/MODIFY\n  maxEmailsPerBatch: 100, // Process in batches to avoid timeouts\n  preserveImportantEmails: true,\n  \n  // AGE SETTINGS\n  deleteOlderThanDays: 365, // Delete emails older than 1 year\n  archiveOlderThanDays: 90,  // Archive emails older than 3 months\n  \n  // WHITELIST - Never delete emails from these domains\n  protectedDomains: [\n    '@company.com',\n    '@client.com', \n    '@bank.com',\n    '@government.gov',\n    // Add your important domains\n  ],\n  \n  // CATEGORIES TO CLEAN\n  categoriesToDelete: [\n    'CATEGORY_PROMOTIONS',\n    'CATEGORY_SOCIAL',\n    'CATEGORY_FORUMS'\n  ],\n  \n  // LABELS TO REMOVE (old custom labels)\n  labelsToRemove: [\n    // Add label IDs of old labels you want to remove\n    // Example: 'Label_1234567890'\n  ],\n  \n  // NEW LABEL STRUCTURE\n  newLabels: {\n    'Work': { color: '#ff0000' },\n    'Personal': { color: '#0000ff' },\n    'Finance': { color: '#00ff00' },\n    'Archive_2024': { color: '#ffff00' },\n    'Archive_2023': { color: '#ff8800' },\n    'To_Review': { color: '#ff00ff' }\n  }\n};\n\nconsole.log('\ud83d\ude80 STARTING COMPLETE MAILBOX CLEANUP');\nconsole.log(`\ud83d\udcca Dry Run Mode: ${config.dryRun ? 'YES (Safe)' : 'NO (Will make changes!)'}`);\nconsole.log(`\ud83d\udcc5 Will delete emails older than: ${config.deleteOlderThanDays} days`);\nconsole.log(`\ud83d\udce6 Will archive emails older than: ${config.archiveOlderThanDays} days`);\nconsole.log(`\ud83d\udee1\ufe0f Protected domains: ${config.protectedDomains.length}`);\n\nif (!config.dryRun) {\n  console.log('\u26a0\ufe0f WARNING: DRY RUN IS OFF - CHANGES WILL BE PERMANENT!');\n}\n\nreturn { config };"
+      },
+      "id": "0a1528db-62bf-4e9c-a578-4b797bbad583",
+      "name": "Setup Configuration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": "={{ $('Setup Configuration').item.json.config.maxEmailsPerBatch }}",
+        "simple": false,
+        "filters": {},
+        "options": {}
+      },
+      "id": "7d35cdb4-38bc-492d-8b32-71c9da5ec382",
+      "name": "Get All Emails (Batch)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        64
+      ],
+      "webhookId": "4e4c05cf-90d6-4c0f-866b-d037f764a6a5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "AE2RUKWx4WCiPnlT",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "action_delete",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "delete",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "659b674c-f9eb-43eb-a7ca-a6ff30a571d2",
+      "name": "Filter: To Delete",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        192,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "action_archive",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "archive",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2389935e-fc63-45dd-90f2-71e706b268ab",
+      "name": "Filter: To Archive",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        192,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "action_keep",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "keep",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "76550f43-ebd8-4373-bfce-f23eae6e7d1c",
+      "name": "Filter: To Recategorize",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        192,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.id }}",
+        "labelIds": [
+          "TRASH"
+        ]
+      },
+      "id": "cb709f8d-1ed8-4593-b9c5-38d3671764b7",
+      "name": "DELETE Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        416,
+        -144
+      ],
+      "webhookId": "2326bbad-b420-4721-ae53-9eedc7625b40",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "AE2RUKWx4WCiPnlT",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "removeLabels",
+        "messageId": "={{ $json.id }}",
+        "labelIds": [
+          "INBOX"
+        ]
+      },
+      "id": "662324e0-5ade-4af8-867b-25b8f78205c6",
+      "name": "ARCHIVE Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        416,
+        64
+      ],
+      "webhookId": "9416cb04-421f-4d7e-a014-c0d1f3f629f0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "AE2RUKWx4WCiPnlT",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Apply new categorization\nconst email = $input.item.json;\nconst config = $('Setup Configuration').item.json.config;\n\n// Skip if dry run\nif (config.dryRun) {\n  console.log(`DRY RUN: Would recategorize ${email.subject} as ${email.newCategory}`);\n  return email;\n}\n\n// Determine new label based on category\nlet newLabelName = '';\nswitch (email.newCategory) {\n  case 'work':\n    newLabelName = 'Work';\n    break;\n  case 'personal':\n    newLabelName = 'Personal';\n    break;\n  case 'finance':\n    newLabelName = 'Finance';\n    break;\n  case 'archive_2024':\n    newLabelName = 'Archive_2024';\n    break;\n  case 'archive_2023':\n    newLabelName = 'Archive_2023';\n    break;\n  default:\n    newLabelName = 'To_Review';\n}\n\nemail.targetLabel = newLabelName;\nreturn email;"
+      },
+      "id": "5bdb9097-afab-41e0-8a67-790170dd9b65",
+      "name": "Prepare Recategorization",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Create comprehensive cleanup summary\nconst deletedEmails = $input.all('DELETE Emails') || [];\nconst archivedEmails = $input.all('ARCHIVE Emails') || [];\nconst recategorizedEmails = $input.all('Prepare Recategorization') || [];\nconst config = $('Setup Configuration').item.json.config;\n\nconst summary = {\n  timestamp: new Date().toISOString(),\n  dryRun: config.dryRun,\n  totals: {\n    deleted: deletedEmails.length,\n    archived: archivedEmails.length,\n    recategorized: recategorizedEmails.length,\n    totalProcessed: deletedEmails.length + archivedEmails.length + recategorizedEmails.length\n  },\n  categories: {},\n  spaceFreed: 0,\n  oldestEmailDeleted: null,\n  newestEmailDeleted: null\n};\n\n// Calculate space freed and date ranges\ndeletedEmails.forEach(item => {\n  const email = item.json;\n  summary.spaceFreed += email.sizeEstimate || 0;\n  \n  const emailDate = new Date(email.date);\n  if (!summary.oldestEmailDeleted || emailDate < new Date(summary.oldestEmailDeleted)) {\n    summary.oldestEmailDeleted = email.date;\n  }\n  if (!summary.newestEmailDeleted || emailDate > new Date(summary.newestEmailDeleted)) {\n    summary.newestEmailDeleted = email.date;\n  }\n});\n\n// Count categories\nrecategorizedEmails.forEach(item => {\n  const category = item.json.newCategory;\n  summary.categories[category] = (summary.categories[category] || 0) + 1;\n});\n\n// Convert bytes to readable format\nfunction formatBytes(bytes) {\n  if (bytes === 0) return '0 Bytes';\n  const k = 1024;\n  const sizes = ['Bytes', 'KB', 'MB', 'GB'];\n  const i = Math.floor(Math.log(bytes) / Math.log(k));\n  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];\n}\n\nconsole.log('\\n\ud83c\udf89 MAILBOX CLEANUP COMPLETE!');\nconsole.log('===============================');\nconsole.log(`\ud83d\udcca Mode: ${config.dryRun ? 'DRY RUN (No changes made)' : 'LIVE RUN (Changes applied)'}`);\nconsole.log(`\ud83d\udce7 Total emails processed: ${summary.totals.totalProcessed}`);\nconsole.log(`\ud83d\uddd1\ufe0f Emails deleted: ${summary.totals.deleted}`);\nconsole.log(`\ud83d\udce6 Emails archived: ${summary.totals.archived}`);\nconsole.log(`\ud83c\udff7\ufe0f Emails recategorized: ${summary.totals.recategorized}`);\nconsole.log(`\ud83d\udcbe Space freed: ${formatBytes(summary.spaceFreed)}`);\n\nif (summary.totals.deleted > 0) {\n  console.log(`\ud83d\udcc5 Deleted emails date range: ${summary.oldestEmailDeleted} to ${summary.newestEmailDeleted}`);\n}\n\nif (Object.keys(summary.categories).length > 0) {\n  console.log('\\n\ud83d\udcc2 New categorization:');\n  Object.entries(summary.categories).forEach(([category, count]) => {\n    console.log(`   ${category}: ${count} emails`);\n  });\n}\n\nif (config.dryRun) {\n  console.log('\\n\u26a0\ufe0f This was a DRY RUN. To apply changes:');\n  console.log('   1. Set dryRun: false in the Setup Configuration node');\n  console.log('   2. Run the workflow again');\n}\n\nreturn summary;"
+      },
+      "id": "74147e9e-3e92-4216-ab8d-ae4dbf46f093",
+      "name": "Create Cleanup Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Analyze and categorize each email\nconst email = $input.item.json;\nconst config = $('Setup Configuration').item.json.config;\n\n// Extract email metadata\nconst headers = {};\nif (email.payload?.headers) {\n email.payload.headers.forEach(header => {\n   headers[header.name.toLowerCase()] = header.value;\n });\n}\n\n// Safe date parsing with fallback\nlet emailDate = new Date();\nlet daysSinceReceived = 0;\n\nif (email.internalDate) {\n const timestamp = parseInt(email.internalDate);\n if (!isNaN(timestamp) && timestamp > 0) {\n   emailDate = new Date(timestamp);\n   if (isNaN(emailDate.getTime())) {\n     // If still invalid, use current date\n     emailDate = new Date();\n   }\n }\n}\n\nconst now = new Date();\nif (emailDate.getTime() <= now.getTime()) {\n daysSinceReceived = Math.floor((now - emailDate) / (1000 * 60 * 60 * 24));\n}\n\nconst senderEmail = headers.from || '';\nconst subject = headers.subject || 'No Subject';\nconst isImportant = email.labelIds?.includes('IMPORTANT');\nconst currentLabels = email.labelIds || [];\n\n// Safety checks\nconst isProtected = config.protectedDomains.some(domain => senderEmail.includes(domain));\nconst shouldPreserve = isProtected || (config.preserveImportantEmails && isImportant);\n\n// Determine action based on age and content\nlet action = 'keep';\nlet newCategory = 'personal';\nlet reasoning = '';\n\nif (shouldPreserve) {\n action = 'keep';\n reasoning = 'Protected sender or important email';\n} else if (daysSinceReceived > config.deleteOlderThanDays) {\n // Very old emails\n if (currentLabels.some(label => config.categoriesToDelete.includes(label))) {\n   action = 'delete';\n   reasoning = `Promotional/social email older than ${config.deleteOlderThanDays} days`;\n } else {\n   action = 'archive';\n   newCategory = `archive_${emailDate.getFullYear()}`;\n   reasoning = `Old email archived by year`;\n }\n} else if (daysSinceReceived > config.archiveOlderThanDays) {\n // Medium age emails\n if (currentLabels.some(label => config.categoriesToDelete.includes(label))) {\n   action = 'delete';\n   reasoning = 'Promotional email older than archive threshold';\n } else {\n   action = 'archive';\n   newCategory = `archive_${emailDate.getFullYear()}`;\n   reasoning = 'Archive older emails by year';\n }\n} else {\n // Recent emails - categorize properly\n if (currentLabels.includes('CATEGORY_PROMOTIONS')) {\n   action = 'delete';\n   reasoning = 'Recent promotional email';\n } else if (senderEmail.includes('@work.com') || senderEmail.includes('@company.')) {\n   newCategory = 'work';\n   reasoning = 'Work-related email';\n } else if (senderEmail.includes('@bank.') || subject.toLowerCase().includes('invoice') || subject.toLowerCase().includes('payment')) {\n   newCategory = 'finance';\n   reasoning = 'Financial email';\n } else {\n   newCategory = 'personal';\n   reasoning = 'Personal email';\n }\n}\n\nconst analysis = {\n id: email.id,\n threadId: email.threadId,\n subject: subject,\n from: senderEmail,\n date: emailDate.toISOString(),\n daysSinceReceived: daysSinceReceived,\n currentLabels: currentLabels,\n action: action,\n newCategory: newCategory,\n reasoning: reasoning,\n isProtected: isProtected,\n sizeEstimate: email.sizeEstimate || 0\n};\n\nreturn analysis;"
+      },
+      "id": "e8655096-9ff3-4a62-8142-1779d92c9da6",
+      "name": "Analyze & Categorize Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        64
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger - START CLEANUP": {
+      "main": [
+        [
+          {
+            "node": "Setup Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup Configuration": {
+      "main": [
+        [
+          {
+            "node": "Get All Emails (Batch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Emails (Batch)": {
+      "main": [
+        [
+          {
+            "node": "Analyze & Categorize Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: To Delete": {
+      "main": [
+        [
+          {
+            "node": "DELETE Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: To Archive": {
+      "main": [
+        [
+          {
+            "node": "ARCHIVE Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: To Recategorize": {
+      "main": [
+        [
+          {
+            "node": "Prepare Recategorization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DELETE Emails": {
+      "main": [
+        [
+          {
+            "node": "Create Cleanup Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ARCHIVE Emails": {
+      "main": [
+        [
+          {
+            "node": "Create Cleanup Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Recategorization": {
+      "main": [
+        [
+          {
+            "node": "Create Cleanup Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze & Categorize Emails": {
+      "main": [
+        [
+          {
+            "node": "Filter: To Recategorize",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter: To Archive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter: To Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "98b57fb3-69dd-4fe4-ae6c-6011afa2c295",
+  "activeVersionId": null,
+  "versionCounter": 2,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2025-08-17T11:56:28.863Z",
+      "createdAt": "2025-08-17T11:56:28.863Z",
+      "role": "workflow:owner",
+      "workflowId": "GW5RXz4KWJgZ9UpX",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

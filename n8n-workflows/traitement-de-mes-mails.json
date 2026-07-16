@@ -1,0 +1,593 @@
+{
+  "updatedAt": "2026-06-11T15:33:33.654Z",
+  "createdAt": "2026-03-23T12:53:54.821Z",
+  "id": "_gdhi2xeqNold3jXYxxoA",
+  "name": "Traitement de mes mails",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "6aa9884e-025b-4b0c-9005-cd5de44fd82a",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -320,
+        -640
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "64b1da60-a010-4843-9228-b147772366bc",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "webhookId": "ae7afa3b-d1ff-41cd-b846-46ba6a2419e1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ygQIRaTq8To8Q1sk",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "id": "f7c42bd5-678e-4eda-9721-3028b224eb97",
+      "name": "Extracteur GTD (Haiku)",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -96,
+        -640
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=De : {{ $json.body.from }}\n\u00c0 : {{ $json.body.to }}\nCc : {{ $json.body.cc }}\nObjet : {{ $json.body.subject }}\nCorps : {{ $json.body.body }}\nSource : {{ $json.body.from ? 'Mail' : 'Teams' }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Tu es l'assistant personnel de Wylliam Delaunay (w.delaunay@groupeonepoint.com). Ton seul but est d'analyser ce message entrant et de le formater pour son syst\u00e8me GTD.\n\nR\u00c8GLE PRIORITAIRE \u2014 CC/Cci :\nSi le champ TO ne contient pas l'adresse de Wylliam (w.delaunay@groupeonepoint.com ou wylliam.delaunay@gmail.com) ET que Wylliam appara\u00eet uniquement dans CC ou Cci \u2192 classer OBLIGATOIREMENT en \ud83d\uddd1\ufe0f Supprimer, quelle que soit la nature du message.\n\nR\u00c8GLES D'ACTION \u2014 choisir UNE seule valeur :\n\n\ud83d\uddd1\ufe0f Supprimer \u2192 si :\n- Exp\u00e9diteur contient no-reply, noreply, donotreply, ou adresse de liste automatique\n- Newsletter, promotion, accus\u00e9 de r\u00e9ception automatique, notification d'outil (Jira, Confluence, Workday auto-g\u00e9n\u00e9r\u00e9s)\n- Wylliam est en Cc/Cci uniquement (voir r\u00e8gle prioritaire ci-dessus)\n- Invitation de r\u00e9union (Microsoft Teams, Outlook), rappel de r\u00e9union, ou demande de confirmation de pr\u00e9sence \u2014 Wylliam g\u00e8re ses r\u00e9ponses directement depuis Outlook\n\n\ud83d\udcc1 R\u00e9f\u00e9rence \u2192 si :\n- Email informatif : note de version, changelog, CR de r\u00e9union sans action demand\u00e9e, document \"pour info\"\n- Wylliam est mentionn\u00e9 mais aucune r\u00e9ponse ou d\u00e9cision n'est attendue de lui\n\n\ud83d\udca4 Someday \u2192 si :\n- Sujet potentiellement utile mais sans deadline ni urgence dans les 30 jours\n- Opportunit\u00e9, id\u00e9e, veille \u00e0 explorer un jour\n\n\ud83d\udcc5 Planifier \u2192 si :\n- Action claire requise mais pas urgente (peut attendre plus de 3 jours)\n\n\ud83d\udc64 D\u00e9l\u00e9guer \u2192 si :\n- L'ex\u00e9cution doit \u00eatre faite par quelqu'un d'autre que Wylliam\n- Demande technique : dev, infra, d\u00e9ploiement, correction de bug\n\n\u27a1\ufe0f Faire \u2192 si :\n- Action directe requise PAR Wylliam dans les 48-72h\n- R\u00e9ponse attendue par un interlocuteur identifi\u00e9\n- Validation, d\u00e9cision ou approbation bloquante pour un tiers\n\nR\u00c8GLE CONFIANCE :\n- \"\u2705 Certain\" \u2192 tu es s\u00fbr \u00e0 plus de 85% de ton choix d'action\n- \"\ud83d\udfe1 \u00c0 v\u00e9rifier\" \u2192 contenu ambigu, tu h\u00e9sites entre 2 cat\u00e9gories, ou le contexte m\u00e9tier manque\n\nSORTIE \u2014 JSON strict, aucun texte avant ni apr\u00e8s, aucun bloc markdown :\n{\n  \"action\": \"une valeur parmi : \u27a1\ufe0f Faire / \ud83d\udcc5 Planifier / \ud83d\udc64 D\u00e9l\u00e9guer / \ud83d\udcc1 R\u00e9f\u00e9rence / \ud83d\uddd1\ufe0f Supprimer / \ud83d\udca4 Someday\",\n  \"titre_action\": \"Verbe + objet court \u2014 mettre null si action est Supprimer\",\n  \"contexte\": \"R\u00e9sum\u00e9 en 2 phrases max des infos utiles du message\",\n  \"confiance\": \"une valeur parmi : \u2705 Certain / \ud83d\udfe1 \u00c0 v\u00e9rifier\",\n  \"categorie_archive\": \"une valeur parmi : Admin / Facturation / Clients / IT & S\u00e9curit\u00e9 / Notifications / Perso / Projets / \u00c0 trier\"\n}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ceb67a5a-62ee-473e-8bc1-05f0ee2f5cb5",
+      "name": "Haiku 4.5",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -24,
+        -416
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "7h7iCjgmfwc33UgQ",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "id": "2741a0b7-43f0-4559-917b-a804a8e69a10",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        -640
+      ],
+      "parameters": {
+        "jsCode": "const raw = $input.item.json.output?.text \n  ?? $input.item.json.text \n  ?? JSON.stringify($input.item.json);\n\nconst cleaned = raw\n  .replace(/```json\\n?/gi, \"\")\n  .replace(/```\\n?/g, \"\")\n  .trim();\n\nreturn { json: { output: JSON.parse(cleaned) } };"
+      }
+    },
+    {
+      "id": "21b51433-ae0c-4004-a53f-1c7c0770c961",
+      "name": "Action Requise ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        -640
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "action-check",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "=Supprimer",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "0efb60e8-16be-4c89-ac1d-784579835e15",
+      "name": "Cr\u00e9er entr\u00e9e Inbox",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        704,
+        -640
+      ],
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "6b279b50-1f54-4b57-b96d-919c5f667730",
+          "mode": "list",
+          "cachedResultName": "\ud83d\udce5 Inbox GTD"
+        },
+        "title": "={{ $json.output.titre_action }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Source|select",
+              "selectValue": "={{ $('Webhook').item.json.body.from ? '\u2709\ufe0f Mail' : '\ud83d\udcac Teams' }}"
+            },
+            {
+              "key": "Lien Source|url",
+              "urlValue": "={{ $('Webhook').item.json.body.mailLink }}"
+            },
+            {
+              "key": "Trait\u00e9|checkbox"
+            },
+            {
+              "key": "Action|select",
+              "selectValue": "={{ $json.output.action }}"
+            },
+            {
+              "key": "Notes|rich_text",
+              "textContent": "={{ $json.output.contexte }}"
+            },
+            {
+              "key": "Confiance|select",
+              "selectValue": "={{ $json.output.confiance }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "id": "e5a78bea-c52b-4bd4-82e6-92344f4f5ffd",
+      "name": "Create a card",
+      "type": "n8n-nodes-base.trello",
+      "typeVersion": 1,
+      "position": [
+        928,
+        -640
+      ],
+      "parameters": {
+        "listId": "69c165e04c2e2b533d9d64cd",
+        "name": "={{ $('Webhook').item.json.body.messageId }}",
+        "description": "={{ $('Extracteur GTD (Haiku)').item.json.output.categorie_archive }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "trelloApi": {
+          "id": "CnhBnSRjQDQ450yl",
+          "name": "Trello account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extracteur GTD (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extracteur GTD (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Haiku 4.5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extracteur GTD (Haiku)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Action Requise ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Action Requise ?": {
+      "main": [
+        [
+          {
+            "node": "Cr\u00e9er entr\u00e9e Inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cr\u00e9er entr\u00e9e Inbox": {
+      "main": [
+        [
+          {
+            "node": "Create a card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "meta": {
+    "aiBuilderAssisted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "3c4921be-0e8e-459d-8455-ea162cffd89e",
+  "activeVersionId": "3c4921be-0e8e-459d-8455-ea162cffd89e",
+  "versionCounter": 376,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-03-23T12:53:54.826Z",
+      "createdAt": "2026-03-23T12:53:54.826Z",
+      "role": "workflow:owner",
+      "workflowId": "_gdhi2xeqNold3jXYxxoA",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-06-11T15:33:33.655Z",
+    "createdAt": "2026-06-11T15:33:33.655Z",
+    "versionId": "3c4921be-0e8e-459d-8455-ea162cffd89e",
+    "workflowId": "_gdhi2xeqNold3jXYxxoA",
+    "nodes": [
+      {
+        "id": "6aa9884e-025b-4b0c-9005-cd5de44fd82a",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          -320,
+          -640
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "64b1da60-a010-4843-9228-b147772366bc",
+          "authentication": "headerAuth",
+          "options": {}
+        },
+        "webhookId": "ae7afa3b-d1ff-41cd-b846-46ba6a2419e1",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "ygQIRaTq8To8Q1sk",
+            "name": "Header Auth account"
+          }
+        }
+      },
+      {
+        "id": "f7c42bd5-678e-4eda-9721-3028b224eb97",
+        "name": "Extracteur GTD (Haiku)",
+        "type": "@n8n/n8n-nodes-langchain.chainLlm",
+        "typeVersion": 1.4,
+        "position": [
+          -96,
+          -640
+        ],
+        "parameters": {
+          "promptType": "define",
+          "text": "=De : {{ $json.body.from }}\n\u00c0 : {{ $json.body.to }}\nCc : {{ $json.body.cc }}\nObjet : {{ $json.body.subject }}\nCorps : {{ $json.body.body }}\nSource : {{ $json.body.from ? 'Mail' : 'Teams' }}",
+          "messages": {
+            "messageValues": [
+              {
+                "message": "Tu es l'assistant personnel de Wylliam Delaunay (w.delaunay@groupeonepoint.com). Ton seul but est d'analyser ce message entrant et de le formater pour son syst\u00e8me GTD.\n\nR\u00c8GLE PRIORITAIRE \u2014 CC/Cci :\nSi le champ TO ne contient pas l'adresse de Wylliam (w.delaunay@groupeonepoint.com ou wylliam.delaunay@gmail.com) ET que Wylliam appara\u00eet uniquement dans CC ou Cci \u2192 classer OBLIGATOIREMENT en \ud83d\uddd1\ufe0f Supprimer, quelle que soit la nature du message.\n\nR\u00c8GLES D'ACTION \u2014 choisir UNE seule valeur :\n\n\ud83d\uddd1\ufe0f Supprimer \u2192 si :\n- Exp\u00e9diteur contient no-reply, noreply, donotreply, ou adresse de liste automatique\n- Newsletter, promotion, accus\u00e9 de r\u00e9ception automatique, notification d'outil (Jira, Confluence, Workday auto-g\u00e9n\u00e9r\u00e9s)\n- Wylliam est en Cc/Cci uniquement (voir r\u00e8gle prioritaire ci-dessus)\n- Invitation de r\u00e9union (Microsoft Teams, Outlook), rappel de r\u00e9union, ou demande de confirmation de pr\u00e9sence \u2014 Wylliam g\u00e8re ses r\u00e9ponses directement depuis Outlook\n\n\ud83d\udcc1 R\u00e9f\u00e9rence \u2192 si :\n- Email informatif : note de version, changelog, CR de r\u00e9union sans action demand\u00e9e, document \"pour info\"\n- Wylliam est mentionn\u00e9 mais aucune r\u00e9ponse ou d\u00e9cision n'est attendue de lui\n\n\ud83d\udca4 Someday \u2192 si :\n- Sujet potentiellement utile mais sans deadline ni urgence dans les 30 jours\n- Opportunit\u00e9, id\u00e9e, veille \u00e0 explorer un jour\n\n\ud83d\udcc5 Planifier \u2192 si :\n- Action claire requise mais pas urgente (peut attendre plus de 3 jours)\n\n\ud83d\udc64 D\u00e9l\u00e9guer \u2192 si :\n- L'ex\u00e9cution doit \u00eatre faite par quelqu'un d'autre que Wylliam\n- Demande technique : dev, infra, d\u00e9ploiement, correction de bug\n\n\u27a1\ufe0f Faire \u2192 si :\n- Action directe requise PAR Wylliam dans les 48-72h\n- R\u00e9ponse attendue par un interlocuteur identifi\u00e9\n- Validation, d\u00e9cision ou approbation bloquante pour un tiers\n\nR\u00c8GLE CONFIANCE :\n- \"\u2705 Certain\" \u2192 tu es s\u00fbr \u00e0 plus de 85% de ton choix d'action\n- \"\ud83d\udfe1 \u00c0 v\u00e9rifier\" \u2192 contenu ambigu, tu h\u00e9sites entre 2 cat\u00e9gories, ou le contexte m\u00e9tier manque\n\nSORTIE \u2014 JSON strict, aucun texte avant ni apr\u00e8s, aucun bloc markdown :\n{\n  \"action\": \"une valeur parmi : \u27a1\ufe0f Faire / \ud83d\udcc5 Planifier / \ud83d\udc64 D\u00e9l\u00e9guer / \ud83d\udcc1 R\u00e9f\u00e9rence / \ud83d\uddd1\ufe0f Supprimer / \ud83d\udca4 Someday\",\n  \"titre_action\": \"Verbe + objet court \u2014 mettre null si action est Supprimer\",\n  \"contexte\": \"R\u00e9sum\u00e9 en 2 phrases max des infos utiles du message\",\n  \"confiance\": \"une valeur parmi : \u2705 Certain / \ud83d\udfe1 \u00c0 v\u00e9rifier\",\n  \"categorie_archive\": \"une valeur parmi : Admin / Facturation / Clients / IT & S\u00e9curit\u00e9 / Notifications / Perso / Projets / \u00c0 trier\"\n}"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "ceb67a5a-62ee-473e-8bc1-05f0ee2f5cb5",
+        "name": "Haiku 4.5",
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "typeVersion": 1.3,
+        "position": [
+          -24,
+          -416
+        ],
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "claude-haiku-4-5-20251001",
+            "mode": "list",
+            "cachedResultName": "Claude Haiku 4.5"
+          },
+          "options": {}
+        },
+        "credentials": {
+          "anthropicApi": {
+            "id": "7h7iCjgmfwc33UgQ",
+            "name": "Anthropic account"
+          }
+        }
+      },
+      {
+        "id": "2741a0b7-43f0-4559-917b-a804a8e69a10",
+        "name": "Code in JavaScript",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          256,
+          -640
+        ],
+        "parameters": {
+          "jsCode": "const raw = $input.item.json.output?.text \n  ?? $input.item.json.text \n  ?? JSON.stringify($input.item.json);\n\nconst cleaned = raw\n  .replace(/```json\\n?/gi, \"\")\n  .replace(/```\\n?/g, \"\")\n  .trim();\n\nreturn { json: { output: JSON.parse(cleaned) } };"
+        }
+      },
+      {
+        "id": "21b51433-ae0c-4004-a53f-1c7c0770c961",
+        "name": "Action Requise ?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          480,
+          -640
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "action-check",
+                "leftValue": "={{ $json.action }}",
+                "rightValue": "=Supprimer",
+                "operator": {
+                  "type": "string",
+                  "operation": "notContains"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        }
+      },
+      {
+        "id": "0efb60e8-16be-4c89-ac1d-784579835e15",
+        "name": "Cr\u00e9er entr\u00e9e Inbox",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          704,
+          -640
+        ],
+        "parameters": {
+          "resource": "databasePage",
+          "databaseId": {
+            "__rl": true,
+            "value": "6b279b50-1f54-4b57-b96d-919c5f667730",
+            "mode": "list",
+            "cachedResultName": "\ud83d\udce5 Inbox GTD"
+          },
+          "title": "={{ $json.output.titre_action }}",
+          "propertiesUi": {
+            "propertyValues": [
+              {
+                "key": "Source|select",
+                "selectValue": "={{ $('Webhook').item.json.body.from ? '\u2709\ufe0f Mail' : '\ud83d\udcac Teams' }}"
+              },
+              {
+                "key": "Lien Source|url",
+                "urlValue": "={{ $('Webhook').item.json.body.mailLink }}"
+              },
+              {
+                "key": "Trait\u00e9|checkbox"
+              },
+              {
+                "key": "Action|select",
+                "selectValue": "={{ $json.output.action }}"
+              },
+              {
+                "key": "Notes|rich_text",
+                "textContent": "={{ $json.output.contexte }}"
+              },
+              {
+                "key": "Confiance|select",
+                "selectValue": "={{ $json.output.confiance }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "kbC5xiCv8qkOKxeF",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "id": "e5a78bea-c52b-4bd4-82e6-92344f4f5ffd",
+        "name": "Create a card",
+        "type": "n8n-nodes-base.trello",
+        "typeVersion": 1,
+        "position": [
+          928,
+          -640
+        ],
+        "parameters": {
+          "listId": "69c165e04c2e2b533d9d64cd",
+          "name": "={{ $('Webhook').item.json.body.messageId }}",
+          "description": "={{ $('Extracteur GTD (Haiku)').item.json.output.categorie_archive }}",
+          "additionalFields": {}
+        },
+        "credentials": {
+          "trelloApi": {
+            "id": "CnhBnSRjQDQ450yl",
+            "name": "Trello account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Extracteur GTD (Haiku)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extracteur GTD (Haiku)": {
+        "main": [
+          [
+            {
+              "node": "Code in JavaScript",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Haiku 4.5": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Extracteur GTD (Haiku)",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code in JavaScript": {
+        "main": [
+          [
+            {
+              "node": "Action Requise ?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Action Requise ?": {
+        "main": [
+          [
+            {
+              "node": "Cr\u00e9er entr\u00e9e Inbox",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Cr\u00e9er entr\u00e9e Inbox": {
+        "main": [
+          [
+            {
+              "node": "Create a card",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Wylliam Delaunay",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-06-11T15:33:38.125Z",
+        "id": 110,
+        "workflowId": "_gdhi2xeqNold3jXYxxoA",
+        "versionId": "3c4921be-0e8e-459d-8455-ea162cffd89e",
+        "event": "activated",
+        "userId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    ]
+  }
+}

@@ -1,0 +1,872 @@
+{
+  "updatedAt": "2026-06-28T10:21:52.156Z",
+  "createdAt": "2026-05-01T06:37:41.266Z",
+  "id": "TzRzsajFZTPp8zY5",
+  "name": "Veille IA - Digest Quotidien v2",
+  "description": "RSS + Perplexity, extraction \u00e9quitable par source via new RegExp(), synth\u00e8se Claude Sonnet, nettoyage HTML, 1 email Gmail quotidien 7h.",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "daysInterval": 3,
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "579d3345-c0de-4de0-a4b0-23179a88b133",
+      "name": "Schedule - 7h chaque matin",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "3171e56f-87f6-4baf-9b2f-e18dc13865dc",
+      "name": "RSS - The Verge AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        80
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "id": "030657a8-1c20-4821-9812-d28221e821a6",
+      "name": "Merge - RSS + Perplexity",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        688,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.technologyreview.com/feed/",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "9c13ac53-1f25-4ef3-8a4e-ab042c49f12b",
+      "name": "RSS - MIT Technology Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        272
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "https://venturebeat.com/category/ai/feed/",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "11268fa1-cb25-4797-8de9-1ef3bdb6d5a8",
+      "name": "RSS - VentureBeat AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        464
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "model": "sonar-pro",
+        "messages": {
+          "message": [
+            {
+              "content": "Tu es un agent de veille technologique IA. Retourne uniquement les faits bruts avec leurs sources, sans mise en forme ni commentaire. Chaque item sur une ligne : [SOURCE] Titre - resume en une phrase. URL.",
+              "role": "system"
+            },
+            {
+              "content": "Recherche les actualites importantes sur l Intelligence Artificielle publiees dans les dernieres 24 heures : nouveaux modeles LLM, outils IA, actualites business (OpenAI, Anthropic, Google, Mistral, Meta), regulations (AI Act, CNIL, Europe), et cas d usage IT innovants. Inclus des sources variees : medias tech internationaux, blogs de recherche, annonces officielles."
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxTokens": 3000,
+          "temperature": 0.2,
+          "searchRecency": "day"
+        },
+        "requestOptions": {}
+      },
+      "id": "f8483962-8767-4025-8bd4-d4292c97f208",
+      "name": "Perplexity - Web Search IA",
+      "type": "n8n-nodes-base.perplexity",
+      "typeVersion": 2,
+      "position": [
+        464,
+        656
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "perplexityApi": {
+          "id": "x2UHVarhFmXcYV5N",
+          "name": "Perplexity account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "all_sources",
+        "options": {}
+      },
+      "id": "6002d252-17b9-49fe-bfb5-48a62f10345c",
+      "name": "Aggregate - Toutes les sources",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        912,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const MAX_PER_SOURCE = 2800;\nconst sources = $input.first().json.all_sources;\n\n// Extraction robuste qui g\u00e8re DEUX formats diff\u00e9rents :\n// - Atom (The Verge) : balises <entry>, <title type=\"html\">, <summary type=\"html\">\n// - RSS 2.0 (MIT, VentureBeat) : balises <item>, <title>, <description>\n// La diff\u00e9rence fondamentale : les attributs dans les balises Atom (type=\"html\")\n// emp\u00eachaient le pattern <title>...</title> de matcher\n\nfunction extractTag(xml, tagName) {\n  const results = [];\n  // Pattern avec [^>]* pour capturer les attributs \u00e9ventuels (type=\"html\", etc.)\n  const re = new RegExp('<' + tagName + '[^>]*>([\\\\s\\\\S]*?)<\\\\/' + tagName + '>', 'gi');\n  let match;\n  while ((match = re.exec(xml)) !== null) {\n    let val = match[1];\n    // Nettoyage CDATA si pr\u00e9sent\n    const cdataMatch = val.match(/^<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>$/);\n    if (cdataMatch) val = cdataMatch[1];\n    // Suppression des balises HTML internes + d\u00e9codage entit\u00e9s de base\n    val = val\n      .replace(/<[^>]+>/g, '')\n      .replace(/&amp;/g, '&')\n      .replace(/&lt;/g, '<')\n      .replace(/&gt;/g, '>')\n      .replace(/&quot;/g, '\"')\n      .replace(/&#\\d+;/g, '')\n      .replace(/&[a-z]+;/g, '')\n      .trim();\n    if (val.length > 3) results.push(val);\n  }\n  return results;\n}\n\nfunction processSource(xml, sourceName) {\n  // D\u00e9tection du format : Atom utilise <entry>, RSS utilise <item>\n  const isAtom = xml.indexOf('<entry>') !== -1 || xml.indexOf('<feed') !== -1;\n  \n  if (isAtom) {\n    // Format Atom (The Verge) : les titres d'articles sont dans les <entry>\n    // On extrait chaque bloc <entry> puis son <title> interne\n    const entryRe = new RegExp('<entry>([\\\\s\\\\S]*?)<\\\\/entry>', 'gi');\n    const articles = [];\n    let entryMatch;\n    while ((entryMatch = entryRe.exec(xml)) !== null && articles.length < 9) {\n      const entryContent = entryMatch[1];\n      // Titre de l'article dans le entry\n      const titleRe = new RegExp('<title[^>]*>([\\\\s\\\\S]*?)<\\\\/title>', 'i');\n      const titleMatch = entryContent.match(titleRe);\n      // R\u00e9sum\u00e9 dans <summary>\n      const summaryRe = new RegExp('<summary[^>]*>([\\\\s\\\\S]*?)<\\\\/summary>', 'i');\n      const summaryMatch = entryContent.match(summaryRe);\n      \n      if (titleMatch) {\n        let title = titleMatch[1];\n        // Extraction CDATA si pr\u00e9sent\n        const cdata = title.match(/^<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>$/);\n        if (cdata) title = cdata[1];\n        title = title.replace(/<[^>]+>/g, '').replace(/&#\\d+;/g, '').replace(/&[a-z]+;/g, '').trim();\n        \n        let summary = '';\n        if (summaryMatch) {\n          summary = summaryMatch[1];\n          const cdataS = summary.match(/^<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>$/);\n          if (cdataS) summary = cdataS[1];\n          summary = summary.replace(/<[^>]+>/g, '').replace(/&#\\d+;/g, '').replace(/&[a-z]+;/g, '').trim().substring(0, 180);\n        }\n        \n        if (title.length > 10) {\n          articles.push('* ' + title + (summary ? ' \u2014 ' + summary : ''));\n        }\n      }\n    }\n    return ('[SOURCE: ' + sourceName + ']\\n' + articles.join('\\n')).substring(0, MAX_PER_SOURCE);\n    \n  } else {\n    // Format RSS 2.0 (MIT, VentureBeat) : les articles sont dans les <item>\n    const itemRe = new RegExp('<item>([\\\\s\\\\S]*?)<\\\\/item>', 'gi');\n    const articles = [];\n    let itemMatch;\n    while ((itemMatch = itemRe.exec(xml)) !== null && articles.length < 9) {\n      const itemContent = itemMatch[1];\n      const titleRe = new RegExp('<title[^>]*>([\\\\s\\\\S]*?)<\\\\/title>', 'i');\n      const descRe = new RegExp('<description[^>]*>([\\\\s\\\\S]*?)<\\\\/description>', 'i');\n      const titleMatch = itemContent.match(titleRe);\n      const descMatch = itemContent.match(descRe);\n      \n      if (titleMatch) {\n        let title = titleMatch[1];\n        const cdata = title.match(/^<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>$/);\n        if (cdata) title = cdata[1];\n        title = title.replace(/<[^>]+>/g, '').replace(/&#\\d+;/g, '').replace(/&[a-z]+;/g, '').trim();\n        \n        let desc = '';\n        if (descMatch) {\n          desc = descMatch[1];\n          const cdataD = desc.match(/^<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>$/);\n          if (cdataD) desc = cdataD[1];\n          desc = desc.replace(/<[^>]+>/g, '').replace(/&#\\d+;/g, '').replace(/&[a-z]+;/g, '').trim().substring(0, 180);\n        }\n        \n        if (title.length > 10) {\n          articles.push('* ' + title + (desc ? ' \u2014 ' + desc : ''));\n        }\n      }\n    }\n    return ('[SOURCE: ' + sourceName + ']\\n' + articles.join('\\n')).substring(0, MAX_PER_SOURCE);\n  }\n}\n\nconst extracted = sources.map(function(item, idx) {\n  // Cas RSS/Atom\n  if (item.data && typeof item.data === 'string') {\n    const sourceNames = ['The Verge AI', 'MIT Technology Review', 'VentureBeat AI'];\n    return processSource(item.data, sourceNames[idx] || ('RSS Source ' + (idx + 1)));\n  }\n  // Cas Perplexity\n  if (item.choices && item.choices[0] && item.choices[0].message && item.choices[0].message.content) {\n    return ('[SOURCE: Perplexity Sonar Pro - Recherche web 24h]\\n' + item.choices[0].message.content).substring(0, MAX_PER_SOURCE);\n  }\n  return null;\n}).filter(function(s) { return s !== null; });\n\nconst finalContext = extracted.join('\\n\\n====================\\n\\n');\nreturn [{ json: { extracted_context: finalContext, source_count: extracted.length } }];"
+      },
+      "id": "1f23f668-fcca-4687-8a82-32b840e6f573",
+      "name": "Extraction equitable des sources",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"Tu es un expert en veille technologique IA pour des professionnels IT.\\n\\nVoici les actualites du jour issues de \" + $json.source_count + \" sources differentes :\\n\\n\" + $json.extracted_context + \"\\n\\nTa mission :\\n1. Identifie les 6 a 10 actualites IA les plus importantes EN PUISANT DANS TOUTES LES SOURCES (The Verge, MIT, VentureBeat ET Perplexity)\\n2. Pour chaque news : titre clair, source explicite, resume 2-3 phrases, impact concret pour un professionnel IT\\n3. Si Perplexity remonte des news absentes des RSS, elles sont prioritaires car plus fraiches\\n4. Section finale Tendance du jour (4-5 lignes de synthese prospective)\\n5. Format : HTML avec CSS inline uniquement, sans balises html/head/body, optimise Gmail\\n6. Langue : francais\\n\\nREGLE ABSOLUE : reponse commence DIRECTEMENT par une balise HTML. INTERDIT d'utiliser des marqueurs Markdown.\" }}",
+        "options": {
+          "systemMessage": "Tu es un expert en veille IA. Produis UNIQUEMENT du HTML brut CSS inline. JAMAIS de backticks Markdown. Commence obligatoirement par une balise HTML ouvrante. Cite la source (The Verge / MIT / VentureBeat / Perplexity) pour chaque news.",
+          "maxIterations": 3
+        }
+      },
+      "id": "b9081781-6068-4896-884b-010d7174ff90",
+      "name": "Agent - Synthese Veille IA",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1360,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-5-20250929",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 3000,
+          "temperature": 0.3
+        }
+      },
+      "id": "5d8e0b60-8270-45aa-8b26-755360dc3f3a",
+      "name": "Claude Sonnet 4.5",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1440,
+        592
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "7h7iCjgmfwc33UgQ",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "clean_output",
+              "name": "html_body",
+              "value": "={{ $json.output.replace(/^```html\\n?/, '').replace(/^```\\n?/, '').replace(/\\n?```$/, '').trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7fa4f995-fa6e-47d9-b2d1-70e3f20d2387",
+      "name": "Nettoyage HTML",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1712,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "wylliam.delaunay@gmail.com",
+        "subject": "={{ '\ud83e\udd16 Veille IA - ' + $now.format('dd/MM/yyyy') }}",
+        "message": "={{ $json.html_body }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "Veille IA Digest"
+        }
+      },
+      "id": "b1314e45-99dc-4349-b6cd-05c411e0c805",
+      "name": "Gmail - Envoi Digest",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1936,
+        368
+      ],
+      "webhookId": "937e4603-5a5a-41ac-b769-66b3ae51674c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "HWscsylP5wBE8mhn",
+          "name": "Main Gmail Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule - 7h chaque matin": {
+      "main": [
+        [
+          {
+            "node": "RSS - The Verge AI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - MIT Technology Review",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - VentureBeat AI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Perplexity - Web Search IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - The Verge AI": {
+      "main": [
+        [
+          {
+            "node": "Merge - RSS + Perplexity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge - RSS + Perplexity": {
+      "main": [
+        [
+          {
+            "node": "Aggregate - Toutes les sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - MIT Technology Review": {
+      "main": [
+        [
+          {
+            "node": "Merge - RSS + Perplexity",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "RSS - VentureBeat AI": {
+      "main": [
+        [
+          {
+            "node": "Merge - RSS + Perplexity",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Perplexity - Web Search IA": {
+      "main": [
+        [
+          {
+            "node": "Merge - RSS + Perplexity",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Aggregate - Toutes les sources": {
+      "main": [
+        [
+          {
+            "node": "Extraction equitable des sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraction equitable des sources": {
+      "main": [
+        [
+          {
+            "node": "Agent - Synthese Veille IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent - Synthese Veille IA": {
+      "main": [
+        [
+          {
+            "node": "Nettoyage HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Sonnet 4.5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent - Synthese Veille IA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nettoyage HTML": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Envoi Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {
+    "node:Schedule - 7h chaque matin": {
+      "recurrenceRules": [
+        195
+      ],
+      "recurrenceRuleSignatures": [
+        "days:3"
+      ]
+    }
+  },
+  "meta": {
+    "aiBuilderAssisted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "486979f0-b687-4f87-9cc0-669600985574",
+  "activeVersionId": "486979f0-b687-4f87-9cc0-669600985574",
+  "versionCounter": 80,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-05-01T06:37:41.269Z",
+      "createdAt": "2026-05-01T06:37:41.269Z",
+      "role": "workflow:owner",
+      "workflowId": "TzRzsajFZTPp8zY5",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-06-28T10:22:00.000Z",
+    "createdAt": "2026-06-28T10:21:52.157Z",
+    "versionId": "486979f0-b687-4f87-9cc0-669600985574",
+    "workflowId": "TzRzsajFZTPp8zY5",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "daysInterval": 3,
+                "triggerAtHour": 7
+              }
+            ]
+          }
+        },
+        "id": "579d3345-c0de-4de0-a4b0-23179a88b133",
+        "name": "Schedule - 7h chaque matin",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          240,
+          368
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "text"
+              }
+            }
+          }
+        },
+        "id": "3171e56f-87f6-4baf-9b2f-e18dc13865dc",
+        "name": "RSS - The Verge AI",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          464,
+          80
+        ],
+        "executeOnce": true
+      },
+      {
+        "parameters": {
+          "numberInputs": 4
+        },
+        "id": "030657a8-1c20-4821-9812-d28221e821a6",
+        "name": "Merge - RSS + Perplexity",
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          688,
+          336
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://www.technologyreview.com/feed/",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "text"
+              }
+            }
+          }
+        },
+        "id": "9c13ac53-1f25-4ef3-8a4e-ab042c49f12b",
+        "name": "RSS - MIT Technology Review",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          464,
+          272
+        ],
+        "executeOnce": true
+      },
+      {
+        "parameters": {
+          "url": "https://venturebeat.com/category/ai/feed/",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "text"
+              }
+            }
+          }
+        },
+        "id": "11268fa1-cb25-4797-8de9-1ef3bdb6d5a8",
+        "name": "RSS - VentureBeat AI",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          464,
+          464
+        ],
+        "executeOnce": true
+      },
+      {
+        "parameters": {
+          "model": "sonar-pro",
+          "messages": {
+            "message": [
+              {
+                "content": "Tu es un agent de veille technologique IA. Retourne uniquement les faits bruts avec leurs sources, sans mise en forme ni commentaire. Chaque item sur une ligne : [SOURCE] Titre - resume en une phrase. URL.",
+                "role": "system"
+              },
+              {
+                "content": "Recherche les actualites importantes sur l Intelligence Artificielle publiees dans les dernieres 24 heures : nouveaux modeles LLM, outils IA, actualites business (OpenAI, Anthropic, Google, Mistral, Meta), regulations (AI Act, CNIL, Europe), et cas d usage IT innovants. Inclus des sources variees : medias tech internationaux, blogs de recherche, annonces officielles."
+              }
+            ]
+          },
+          "simplify": true,
+          "options": {
+            "maxTokens": 3000,
+            "temperature": 0.2,
+            "searchRecency": "day"
+          },
+          "requestOptions": {}
+        },
+        "id": "f8483962-8767-4025-8bd4-d4292c97f208",
+        "name": "Perplexity - Web Search IA",
+        "type": "n8n-nodes-base.perplexity",
+        "typeVersion": 2,
+        "position": [
+          464,
+          656
+        ],
+        "executeOnce": true,
+        "credentials": {
+          "perplexityApi": {
+            "id": "x2UHVarhFmXcYV5N",
+            "name": "Perplexity account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "aggregate": "aggregateAllItemData",
+          "destinationFieldName": "all_sources",
+          "options": {}
+        },
+        "id": "6002d252-17b9-49fe-bfb5-48a62f10345c",
+        "name": "Aggregate - Toutes les sources",
+        "type": "n8n-nodes-base.aggregate",
+        "typeVersion": 1,
+        "position": [
+          912,
+          368
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const MAX_PER_SOURCE = 2800;\nconst sources = $input.first().json.all_sources;\n\n// Extraction robuste qui g\u00e8re DEUX formats diff\u00e9rents :\n// - Atom (The Verge) : balises <entry>, <title type=\"html\">, <summary type=\"html\">\n// - RSS 2.0 (MIT, VentureBeat) : balises <item>, <title>, <description>\n// La diff\u00e9rence fondamentale : les attributs dans les balises Atom (type=\"html\")\n// emp\u00eachaient le pattern <title>...</title> de matcher\n\nfunction extractTag(xml, tagName) {\n  const results = [];\n  // Pattern avec [^>]* pour capturer les attributs \u00e9ventuels (type=\"html\", etc.)\n  const re = new RegExp('<' + tagName + '[^>]*>([\\\\s\\\\S]*?)<\\\\/' + tagName + '>', 'gi');\n  let match;\n  while ((match = re.exec(xml)) !== null) {\n    let val = match[1];\n    // Nettoyage CDATA si pr\u00e9sent\n    const cdataMatch = val.match(/^<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>$/);\n    if (cdataMatch) val = cdataMatch[1];\n    // Suppression des balises HTML internes + d\u00e9codage entit\u00e9s de base\n    val = val\n      .replace(/<[^>]+>/g, '')\n      .replace(/&amp;/g, '&')\n      .replace(/&lt;/g, '<')\n      .replace(/&gt;/g, '>')\n      .replace(/&quot;/g, '\"')\n      .replace(/&#\\d+;/g, '')\n      .replace(/&[a-z]+;/g, '')\n      .trim();\n    if (val.length > 3) results.push(val);\n  }\n  return results;\n}\n\nfunction processSource(xml, sourceName) {\n  // D\u00e9tection du format : Atom utilise <entry>, RSS utilise <item>\n  const isAtom = xml.indexOf('<entry>') !== -1 || xml.indexOf('<feed') !== -1;\n  \n  if (isAtom) {\n    // Format Atom (The Verge) : les titres d'articles sont dans les <entry>\n    // On extrait chaque bloc <entry> puis son <title> interne\n    const entryRe = new RegExp('<entry>([\\\\s\\\\S]*?)<\\\\/entry>', 'gi');\n    const articles = [];\n    let entryMatch;\n    while ((entryMatch = entryRe.exec(xml)) !== null && articles.length < 9) {\n      const entryContent = entryMatch[1];\n      // Titre de l'article dans le entry\n      const titleRe = new RegExp('<title[^>]*>([\\\\s\\\\S]*?)<\\\\/title>', 'i');\n      const titleMatch = entryContent.match(titleRe);\n      // R\u00e9sum\u00e9 dans <summary>\n      const summaryRe = new RegExp('<summary[^>]*>([\\\\s\\\\S]*?)<\\\\/summary>', 'i');\n      const summaryMatch = entryContent.match(summaryRe);\n      \n      if (titleMatch) {\n        let title = titleMatch[1];\n        // Extraction CDATA si pr\u00e9sent\n        const cdata = title.match(/^<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>$/);\n        if (cdata) title = cdata[1];\n        title = title.replace(/<[^>]+>/g, '').replace(/&#\\d+;/g, '').replace(/&[a-z]+;/g, '').trim();\n        \n        let summary = '';\n        if (summaryMatch) {\n          summary = summaryMatch[1];\n          const cdataS = summary.match(/^<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>$/);\n          if (cdataS) summary = cdataS[1];\n          summary = summary.replace(/<[^>]+>/g, '').replace(/&#\\d+;/g, '').replace(/&[a-z]+;/g, '').trim().substring(0, 180);\n        }\n        \n        if (title.length > 10) {\n          articles.push('* ' + title + (summary ? ' \u2014 ' + summary : ''));\n        }\n      }\n    }\n    return ('[SOURCE: ' + sourceName + ']\\n' + articles.join('\\n')).substring(0, MAX_PER_SOURCE);\n    \n  } else {\n    // Format RSS 2.0 (MIT, VentureBeat) : les articles sont dans les <item>\n    const itemRe = new RegExp('<item>([\\\\s\\\\S]*?)<\\\\/item>', 'gi');\n    const articles = [];\n    let itemMatch;\n    while ((itemMatch = itemRe.exec(xml)) !== null && articles.length < 9) {\n      const itemContent = itemMatch[1];\n      const titleRe = new RegExp('<title[^>]*>([\\\\s\\\\S]*?)<\\\\/title>', 'i');\n      const descRe = new RegExp('<description[^>]*>([\\\\s\\\\S]*?)<\\\\/description>', 'i');\n      const titleMatch = itemContent.match(titleRe);\n      const descMatch = itemContent.match(descRe);\n      \n      if (titleMatch) {\n        let title = titleMatch[1];\n        const cdata = title.match(/^<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>$/);\n        if (cdata) title = cdata[1];\n        title = title.replace(/<[^>]+>/g, '').replace(/&#\\d+;/g, '').replace(/&[a-z]+;/g, '').trim();\n        \n        let desc = '';\n        if (descMatch) {\n          desc = descMatch[1];\n          const cdataD = desc.match(/^<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>$/);\n          if (cdataD) desc = cdataD[1];\n          desc = desc.replace(/<[^>]+>/g, '').replace(/&#\\d+;/g, '').replace(/&[a-z]+;/g, '').trim().substring(0, 180);\n        }\n        \n        if (title.length > 10) {\n          articles.push('* ' + title + (desc ? ' \u2014 ' + desc : ''));\n        }\n      }\n    }\n    return ('[SOURCE: ' + sourceName + ']\\n' + articles.join('\\n')).substring(0, MAX_PER_SOURCE);\n  }\n}\n\nconst extracted = sources.map(function(item, idx) {\n  // Cas RSS/Atom\n  if (item.data && typeof item.data === 'string') {\n    const sourceNames = ['The Verge AI', 'MIT Technology Review', 'VentureBeat AI'];\n    return processSource(item.data, sourceNames[idx] || ('RSS Source ' + (idx + 1)));\n  }\n  // Cas Perplexity\n  if (item.choices && item.choices[0] && item.choices[0].message && item.choices[0].message.content) {\n    return ('[SOURCE: Perplexity Sonar Pro - Recherche web 24h]\\n' + item.choices[0].message.content).substring(0, MAX_PER_SOURCE);\n  }\n  return null;\n}).filter(function(s) { return s !== null; });\n\nconst finalContext = extracted.join('\\n\\n====================\\n\\n');\nreturn [{ json: { extracted_context: finalContext, source_count: extracted.length } }];"
+        },
+        "id": "1f23f668-fcca-4687-8a82-32b840e6f573",
+        "name": "Extraction equitable des sources",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1136,
+          368
+        ]
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ \"Tu es un expert en veille technologique IA pour des professionnels IT.\\n\\nVoici les actualites du jour issues de \" + $json.source_count + \" sources differentes :\\n\\n\" + $json.extracted_context + \"\\n\\nTa mission :\\n1. Identifie les 6 a 10 actualites IA les plus importantes EN PUISANT DANS TOUTES LES SOURCES (The Verge, MIT, VentureBeat ET Perplexity)\\n2. Pour chaque news : titre clair, source explicite, resume 2-3 phrases, impact concret pour un professionnel IT\\n3. Si Perplexity remonte des news absentes des RSS, elles sont prioritaires car plus fraiches\\n4. Section finale Tendance du jour (4-5 lignes de synthese prospective)\\n5. Format : HTML avec CSS inline uniquement, sans balises html/head/body, optimise Gmail\\n6. Langue : francais\\n\\nREGLE ABSOLUE : reponse commence DIRECTEMENT par une balise HTML. INTERDIT d'utiliser des marqueurs Markdown.\" }}",
+          "options": {
+            "systemMessage": "Tu es un expert en veille IA. Produis UNIQUEMENT du HTML brut CSS inline. JAMAIS de backticks Markdown. Commence obligatoirement par une balise HTML ouvrante. Cite la source (The Verge / MIT / VentureBeat / Perplexity) pour chaque news.",
+            "maxIterations": 3
+          }
+        },
+        "id": "b9081781-6068-4896-884b-010d7174ff90",
+        "name": "Agent - Synthese Veille IA",
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 3.1,
+        "position": [
+          1360,
+          368
+        ]
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "mode": "list",
+            "value": "claude-sonnet-4-5-20250929",
+            "cachedResultName": "Claude Sonnet 4.5"
+          },
+          "options": {
+            "maxTokensToSample": 3000,
+            "temperature": 0.3
+          }
+        },
+        "id": "5d8e0b60-8270-45aa-8b26-755360dc3f3a",
+        "name": "Claude Sonnet 4.5",
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "typeVersion": 1.3,
+        "position": [
+          1440,
+          592
+        ],
+        "credentials": {
+          "anthropicApi": {
+            "id": "7h7iCjgmfwc33UgQ",
+            "name": "Anthropic account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "clean_output",
+                "name": "html_body",
+                "value": "={{ $json.output.replace(/^```html\\n?/, '').replace(/^```\\n?/, '').replace(/\\n?```$/, '').trim() }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "7fa4f995-fa6e-47d9-b2d1-70e3f20d2387",
+        "name": "Nettoyage HTML",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          1712,
+          368
+        ]
+      },
+      {
+        "parameters": {
+          "sendTo": "wylliam.delaunay@gmail.com",
+          "subject": "={{ '\ud83e\udd16 Veille IA - ' + $now.format('dd/MM/yyyy') }}",
+          "message": "={{ $json.html_body }}",
+          "options": {
+            "appendAttribution": false,
+            "senderName": "Veille IA Digest"
+          }
+        },
+        "id": "b1314e45-99dc-4349-b6cd-05c411e0c805",
+        "name": "Gmail - Envoi Digest",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.2,
+        "position": [
+          1936,
+          368
+        ],
+        "webhookId": "937e4603-5a5a-41ac-b769-66b3ae51674c",
+        "credentials": {
+          "gmailOAuth2": {
+            "id": "HWscsylP5wBE8mhn",
+            "name": "Main Gmail Account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Schedule - 7h chaque matin": {
+        "main": [
+          [
+            {
+              "node": "RSS - The Verge AI",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "RSS - MIT Technology Review",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "RSS - VentureBeat AI",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Perplexity - Web Search IA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "RSS - The Verge AI": {
+        "main": [
+          [
+            {
+              "node": "Merge - RSS + Perplexity",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Merge - RSS + Perplexity": {
+        "main": [
+          [
+            {
+              "node": "Aggregate - Toutes les sources",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "RSS - MIT Technology Review": {
+        "main": [
+          [
+            {
+              "node": "Merge - RSS + Perplexity",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "RSS - VentureBeat AI": {
+        "main": [
+          [
+            {
+              "node": "Merge - RSS + Perplexity",
+              "type": "main",
+              "index": 2
+            }
+          ]
+        ]
+      },
+      "Perplexity - Web Search IA": {
+        "main": [
+          [
+            {
+              "node": "Merge - RSS + Perplexity",
+              "type": "main",
+              "index": 3
+            }
+          ]
+        ]
+      },
+      "Aggregate - Toutes les sources": {
+        "main": [
+          [
+            {
+              "node": "Extraction equitable des sources",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extraction equitable des sources": {
+        "main": [
+          [
+            {
+              "node": "Agent - Synthese Veille IA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Agent - Synthese Veille IA": {
+        "main": [
+          [
+            {
+              "node": "Nettoyage HTML",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claude Sonnet 4.5": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Agent - Synthese Veille IA",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Nettoyage HTML": {
+        "main": [
+          [
+            {
+              "node": "Gmail - Envoi Digest",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Wylliam Delaunay",
+    "name": "Version 486979f0",
+    "description": "",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-06-28T10:22:00.696Z",
+        "id": 201,
+        "workflowId": "TzRzsajFZTPp8zY5",
+        "versionId": "486979f0-b687-4f87-9cc0-669600985574",
+        "event": "activated",
+        "userId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    ]
+  }
+}

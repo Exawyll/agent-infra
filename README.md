@@ -1,0 +1,132 @@
+# agent-infra
+
+Infrastructure reproductible pour KVM2 (le cerveau) : n8n + Hermes + LiteLLM.
+
+> **Statut :** ⚠️ NON FIABLE — Test de restauration à valider (Phase 2)
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  KVM2 — Cerveau (ce VPS)                        │
+│                                                  │
+│  ┌─────────────┐  ┌──────────────────────────┐  │
+│  │  n8n        │  │  Hermes (natif)           │  │
+│  │  (Docker)   │  │  systemd + profiles       │  │
+│  │  + Traefik  │  │  dev  |  pro              │  │
+│  └─────────────┘  └──────────────────────────┘  │
+│  ┌─────────────┐                                │
+│  │  LiteLLM    │  ← Routeur de modèles          │
+│  │  (Docker)   │    alias: rapide/code/review   │
+│  └─────────────┘                                │
+│         │ Tailscale                             │
+└─────────┼───────────────────────────────────────┘
+          │
+┌─────────┼───────────────────────────────────────┐
+│  KVM1 — Mains (VPS dev)                         │
+│  Conteneurs éphémères pour exécution du daemon  │
+│  Reçoit les backups n8n quotidiens              │
+└─────────────────────────────────────────────────┘
+```
+
+## Prérequis (restore from scratch)
+
+**Un seul prérequis :** la clé privée AGE (stockée hors ligne).
+
+| Où ? | Quoi ? |
+|---|---|
+| Password manager | `AGE-SECRET-KEY-1N8KV...` |
+| `~/.age/key.txt` | Clé restaurée par `restore.sh` |
+| GitHub | Ce repo (agent-infra) |
+
+Sans la clé AGE : impossible de déchiffrer `secrets/.env.enc.env` → impossible de redéployer.
+
+## Redéploiement complet
+
+```bash
+# 1. VPS vierge (Ubuntu 22.04+), SSH en root
+# 2. Récupérer la clé AGE (password manager)
+# 3. Lancer le restore
+curl -sSfL https://raw.githubusercontent.com/Exawyll/agent-infra/main/scripts/restore.sh | bash -s ~/age-key.txt
+```
+
+Ou manuellement :
+
+```bash
+git clone https://github.com/Exawyll/agent-infra.git
+cd agent-infra
+./scripts/restore.sh ~/age-key.txt
+```
+
+## Déploiement idempotent (composant par composant)
+
+```bash
+./scripts/deploy.sh all       # Tout
+./scripts/deploy.sh n8n       # Stack Docker n8n + Traefik
+./scripts/deploy.sh litellm   # LiteLLM
+./scripts/deploy.sh hermes    # Système Hermes (systemd)
+```
+
+## Backup n8n
+
+```bash
+# Manuel
+./scripts/backup-n8n-volume.sh
+
+# Planifié (cron quotidien) — ajouter :
+# 0 2 * * * /root/agent-infra/scripts/backup-n8n-volume.sh
+```
+
+## Gestion des secrets
+
+```bash
+# Chiffrer (après modification du .env)
+sops --encrypt .env > secrets/.env.enc.env
+
+# Déchiffrer
+./scripts/decrypt-secrets.sh
+```
+
+## Structure
+
+```
+agent-infra/
+├── kvm2/                        # Ce VPS (cerveau)
+│   ├── docker/
+│   │   ├── n8n/                 # n8n + Traefik (docker-compose + .env.template)
+│   │   └── litellm/             # LiteLLM routeur de modèles
+│   └── hermes/
+│       ├── config.yaml          # Config Hermes (versionnée)
+│       ├── hermes.service       # Systemd unit
+│       ├── install.sh           # Script d'installation reproductible
+│       └── profiles/
+├── kvm1/                        # VPS dev (mains)
+│   ├── docker/                  # Conteneurs éphémères
+│   └── agent-daemon/            # Scripts du daemon dev
+├── n8n-workflows/               # Exports JSON (versionnés pour le diff)
+├── prompts/                     # Prompts d'agents (versionnés)
+├── scripts/
+│   ├── deploy.sh                # Déploiement idempotent (n8n|litellm|hermes|all)
+│   ├── restore.sh               # Restauration complète from scratch
+│   ├── backup-n8n-volume.sh     # Backup volume Docker n8n → KVM1
+│   ├── decrypt-secrets.sh       # Déchiffre secrets SOPS
+│   ├── import-workflows.sh      # Import workflows n8n
+│   └── install-hooks.sh         # Installe le hook pre-commit gitleaks
+├── secrets/
+│   └── .env.enc.env             # .env CHIFFRÉ (SOPS + age)
+├── .sops.yaml                   # Config SOPS (clé publique age)
+├── .gitleaks.toml               # Config gitleaks
+└── README.md
+```
+
+## Versions figées
+
+| Composant | Version |
+|---|---|
+| n8n | `2.30.5` |
+| Traefik | `v3.3` |
+| LiteLLM | `main-v1.55.0` |
+| Hermes | `0.17.0` |
+| sops | `3.9.4` |
+| age | `1.2.1` |
+| gitleaks | `8.23.3` |

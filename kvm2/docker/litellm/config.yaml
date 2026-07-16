@@ -1,0 +1,25 @@
+# LiteLLM Proxy Config
+# ⚠️  Ce fichier est un SQUELETTE — à remplir quand LiteLLM sera installé
+# Voir le plan Notion : Configuration LiteLLM — pas-à-pas
+
+model_list:
+  - model_name: rapide
+    litellm_params:
+      model: openrouter/deepseek/deepseek-chat
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: code
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: raisonnement
+    litellm_params:
+      model: openrouter/deepseek/deepseek-reasoner
+      api_key: os.environ/OPENROUTER_API_KEY
+
+litellm_settings:
+  drop_params: true
+  set_verbose: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL

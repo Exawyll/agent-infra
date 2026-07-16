@@ -1,0 +1,236 @@
+{
+  "updatedAt": "2026-05-01T07:49:09.000Z",
+  "createdAt": "2025-08-18T12:46:51.743Z",
+  "id": "QEsCbMRbDkXYmga3",
+  "name": "Gmail - MCP copy",
+  "description": null,
+  "active": false,
+  "isArchived": true,
+  "nodes": [
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-3-5-haiku-20241022",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 3.5"
+        },
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "id": "396708e2-f391-4c42-9b18-85db8b7fae4e",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -48,
+        0
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "7h7iCjgmfwc33UgQ",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Return_All', ``, 'boolean') }}",
+        "simple": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Simplify', ``, 'boolean') }}",
+        "filters": {
+          "q": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Search', ``, 'string') }}"
+        },
+        "options": {}
+      },
+      "id": "71c518b5-e7e2-4279-b9ab-7aa80fcd3923",
+      "name": "Gmail: Get Messages",
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        144,
+        0
+      ],
+      "webhookId": "593d7709-7f57-4009-90a6-be90eebcdfa6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "AE2RUKWx4WCiPnlT",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are my Gmail cleanup assistant. Your ONLY task is to delete emails in bulk by batches of 50.\n\nCLEANUP INSTRUCTIONS:\n1. Always use the Gmail search with this exact query: before:2024/8/19\n   \u2192 This means: find all emails received before August 19, 2024.\n2. Always request up to 50 messages at a time.\n3. For each batch:\n   - Get the message IDs\n   - Move them to the TRASH label (do NOT archive, do NOT categorize)\n   - Confirm how many you moved\n4. After moving 50, search again with the same query.\n5. Repeat until no more messages are found.\n6. When finished, return a final JSON summary:\n{\n  \"total_deleted\": <number>,\n  \"batches\": <number>,\n  \"completed\": true\n}\n\nRULES:\n- Do not analyze, categorize, or label emails (except TRASH).\n- Do not skip any emails that match the query.\n- Do not stop until the mailbox is empty for this query.\n- If you find zero emails in a batch, stop immediately and output the final summary.\n- Safety: This workflow should only affect emails older than Aug 19, 2024.\n\nEXAMPLE ACTIONS:\n- gmail_get_messages with query before:2024/8/19 and limit 50\n- gmail_add_labels with labelIds: TRASH",
+        "options": {
+          "systemMessage": "You are an intelligent email management assistant that helps categorize and organize emails through conversation.\n\n**AVAILABLE TOOLS:**\n- gmail_get_messages: Search and retrieve emails\n- gmail_get_message_details: Get full email content and headers  \n- gmail_add_labels: Add labels to emails (for categorization)\n- gmail_remove_labels: Remove labels from emails (for archiving)\n- gmail_create_label: Create new organization labels\n- gmail_get_all_labels: See existing labels\n- gmail_delete_email: Delete emails (TRASH label)\n\n**SAFETY FIRST - NEVER DELETE:**\n- Emails requesting action, response, or decision from the user\n- Work emails from colleagues, clients, or business contacts\n- Emails with deadlines, meetings, or appointments\n- Financial emails (invoices, statements, payments)\n- Legal or official documents\n- Personal emails from friends/family requiring response\n- Emails marked as Important\n- Emails that are part of ongoing conversations\n\n**INTELLIGENT CATEGORIZATION:**\n1. **Always analyze email content first** using gmail_get_message_details\n2. **Look for action indicators:**\n   - Questions directed at the user\n   - Requests for information or decisions\n   - Deadlines or time-sensitive content\n   - Meeting invitations or schedule changes\n   - \"Please confirm\", \"Please review\", \"Action required\"\n\n3. **Categorize based on content and sender:**\n   - **Work**: Business emails, project updates, client communication\n   - **Personal**: Friends, family, personal matters\n   - **Finance**: Banking, payments, receipts, taxes\n   - **Travel**: Bookings, tickets, itineraries\n   - **Shopping**: Order confirmations, shipping notifications\n   - **Newsletters**: Subscriptions, updates (safe to archive if old)\n   - **Promotions**: Marketing emails (safe to delete if old)\n\n**LABEL MANAGEMENT:**\n1. **Always check existing labels first** using gmail_get_all_labels\n2. **Only create labels that don't exist**\n3. **Use existing label IDs** when they're available\n4. **Never try to create duplicate labels**\n\n**PROCESS:**\n1. Get existing labels with gmail_get_all_labels\n2. Check if needed labels exist\n3. If label exists, use its ID\n4. If label doesn't exist, create it with gmail_create_label\n5. Then use the label ID to categorize emails\n\n**LABEL FORMAT:**\n- When using gmail_add_labels, pass just the label ID (not array format)\n- Example: labelIds: \"Label_30\" (not [\"Label_30\"])\n\n**DECISION PROCESS:**\n1. **Get email details** to understand content and context\n2. **Assess importance and action requirements**\n3. **Ask user if uncertain** about important decisions\n4. **Categorize or archive** based on analysis\n5. **Only delete obvious promotional/spam emails**\n\n**CONVERSATIONAL APPROACH:**\n- Explain your reasoning for each decision\n- Ask for confirmation before bulk actions\n- Suggest organization strategies\n- Learn user preferences over time\n- Be conservative with deletions\n\n**CURRENT DATE CONTEXT:**\nToday is August 17, 2025. Use this for date-based searches and decisions.\n\n**FINALLY: Return JSON with EXACTLY what you did**\n\n**REQUIRED JSON FORMAT (no other text):**\n{\n  \"emails_processed\": [\n    {\n      \"id\": \"actual_email_id\", \n      \"subject\": \"actual_subject\",\n      \"action_taken\": \"deleted|archived|categorized\",\n      \"tool_used\": \"gmail_add_labels\",\n      \"labels_applied\": [\"TRASH\"],\n      \"reasoning\": \"why you did this\"\n    }\n  ],\n  \"summary\": {\n    \"total\": 3,\n    \"deleted\": 1, \n    \"archived\": 1,\n    \"categorized\": 1\n  }\n}\n\nAlways end with this structured JSON response after explaining your actions.",
+          "maxIterations": 30
+        }
+      },
+      "id": "e8287211-ff6a-4e00-95d5-0fc5c8c0c54e",
+      "name": "AI Email Management Agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        48,
+        -224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $fromAI('messageId', '', 'string') }}",
+        "labelIds": "={{ [\"TRASH\"] }}"
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        272,
+        0
+      ],
+      "id": "dc3d53d5-ac90-4aa0-b0d0-324089fcc9ce",
+      "name": "Gmail: Delete Email",
+      "webhookId": "24465e1e-6fb3-4ede-acbb-3a39880fa3c7",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "AE2RUKWx4WCiPnlT",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process and structure data for Google Sheets logging\nconst agentResults = $input.all();\nconst timestamp = new Date();\n\n// Initialize default values\nlet processedData = {\n  date: timestamp.toISOString().split('T')[0],\n  time: timestamp.toTimeString().split(' ')[0],\n  totalEmails: 0,\n  deleted: 0,\n  categorized: 0,\n  archived: 0,\n  emailDetails: 'No emails processed',\n  workflowId: `${$workflow.id}-${$execution.id}`\n};\n\n// Process agent results if available\nif (agentResults && agentResults.length > 0) {\n  agentResults.forEach(result => {\n    if (result.json) {\n      let agentData = {};\n      \n      try {\n        // Try to parse agent output\n        if (result.json.output) {\n          // Extract JSON from text response\n          const outputText = result.json.output;\n          const jsonStart = outputText.indexOf('{');\n          const jsonEnd = outputText.lastIndexOf('}') + 1;\n          \n          if (jsonStart !== -1 && jsonEnd > jsonStart) {\n            const jsonString = outputText.substring(jsonStart, jsonEnd);\n            agentData = JSON.parse(jsonString);\n          }\n        } else {\n          agentData = result.json;\n        }\n        \n        // Extract summary data\n        if (agentData.summary) {\n          processedData.totalEmails = agentData.summary.total || 0;\n          processedData.deleted = agentData.summary.deleted || 0;\n          processedData.categorized = agentData.summary.categorized || 0;\n          processedData.archived = agentData.summary.archived || 0;\n        }\n        \n        // Extract email details\n        if (agentData.emails_processed && Array.isArray(agentData.emails_processed)) {\n          const emailSummaries = agentData.emails_processed.map(email => {\n            return {\n              subject: (email.subject || 'No Subject').substring(0, 50),\n              action: email.action_taken || 'unknown',\n              reasoning: (email.reasoning || 'No reason').substring(0, 100)\n            };\n          });\n          \n          processedData.emailDetails = JSON.stringify(emailSummaries);\n          \n          // Update totals if summary not available\n          if (!agentData.summary) {\n            processedData.totalEmails = emailSummaries.length;\n            processedData.deleted = emailSummaries.filter(e => e.action === 'deleted').length;\n            processedData.categorized = emailSummaries.filter(e => e.action === 'categorized').length;\n            processedData.archived = emailSummaries.filter(e => e.action === 'archived').length;\n          }\n        }\n        \n      } catch (error) {\n        console.log('Error parsing agent data:', error.message);\n        processedData.emailDetails = `Error: ${error.message}`;\n      }\n    }\n  });\n}\n\n// Log the structured data\nconsole.log('\ud83d\udcca Structured data for Google Sheets:');\nconsole.log(`\ud83d\udcc5 Date: ${processedData.date}`);\nconsole.log(`\u23f0 Time: ${processedData.time}`);\nconsole.log(`\ud83d\udce7 Total: ${processedData.totalEmails}`);\nconsole.log(`\ud83d\uddd1\ufe0f Deleted: ${processedData.deleted}`);\nconsole.log(`\ud83c\udff7\ufe0f Categorized: ${processedData.categorized}`);\nconsole.log(`\ud83d\udce6 Archived: ${processedData.archived}`);\n\n// Return structured data for Google Sheets\nreturn {\n  Date: processedData.date,\n  Time: processedData.time,\n  Total_Emails: processedData.totalEmails,\n  Deleted: processedData.deleted,\n  Categorized: processedData.categorized,\n  Archived: processedData.archived,\n  Email_Details: processedData.emailDetails,\n  Workflow_ID: processedData.workflowId\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        -224
+      ],
+      "id": "72329640-bf09-4a1c-b3b8-5628eab81f7d",
+      "name": "Structure Data for Sheets"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        -224
+      ],
+      "id": "caa5f90f-8949-4f12-a291-e5b4ad214f49",
+      "name": "When clicking \u2018Execute workflow\u2019"
+    }
+  ],
+  "connections": {
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Email Management Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail: Get Messages": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Email Management Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Email Management Agent1": {
+      "main": [
+        [
+          {
+            "node": "Structure Data for Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail: Delete Email": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Email Management Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure Data for Sheets": {
+      "main": [
+        []
+      ]
+    },
+    "When clicking \u2018Execute workflow\u2019": {
+      "main": [
+        [
+          {
+            "node": "AI Email Management Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "node:Gmail Trigger": {
+      "Gmail Trigger": {
+        "lastTimeChecked": 1755518887,
+        "possibleDuplicates": [
+          "198bd146457b4880",
+          "198bc6c676a8c7db"
+        ]
+      }
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "c8277770-bfc6-4553-8ea2-472c829505ad",
+  "activeVersionId": null,
+  "versionCounter": 2,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2025-08-18T12:46:51.746Z",
+      "createdAt": "2025-08-18T12:46:51.746Z",
+      "role": "workflow:owner",
+      "workflowId": "QEsCbMRbDkXYmga3",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

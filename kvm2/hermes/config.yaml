@@ -1,0 +1,28 @@
+# Hermes Agent config — KVM2 default profile
+# Voir : https://hermes-agent.nousresearch.com/docs
+
+model:
+  base_url: https://api.deepseek.com/v1
+  default: deepseek-reasoner
+  fallback_model:
+    model: openrouter/anthropic/claude-sonnet-4
+    provider: openrouter
+  provider: deepseek
+
+providers: {}
+fallback_providers:
+  - model: openrouter/deepseek/deepseek-v4-pro
+    provider: openrouter
+
+toolsets:
+  - hermes-cli
+
+agent:
+  max_turns: 150
+  gateway_timeout: 1800
+  api_max_retries: 3
+  tool_use_enforcement: auto
+  task_completion_guidance: true
+  parallel_tool_call_guidance: true
+  environment_probe: true
+  coding_context: auto

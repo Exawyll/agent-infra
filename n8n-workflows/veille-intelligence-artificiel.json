@@ -1,0 +1,222 @@
+{
+  "updatedAt": "2026-01-07T12:31:28.441Z",
+  "createdAt": "2025-10-25T16:31:31.607Z",
+  "id": "CreZ8UK35hUDZEvk",
+  "name": "Veille Intelligence Artificiel",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Recherche les actualit\u00e9s publi\u00e9es au cours des 7 derniers jours concernant l'Intelligence Artificielle (nouveaux mod\u00e8les, outils g\u00e9n\u00e9ratifs, r\u00e9gulations et impacts business).\n\nPr\u00e9pare le rapport hebdomadaire de veille technologique complet au format HTML compatible Gmail selon les instructions du syst\u00e8me.\n\nFormat : Code HTML brut (sans CSS externe, optimis\u00e9 pour email).\n\nContenu : Inclue la date du jour dans le commentaire d\u2019objet et le corps du rapport.\n\nStructure : Organise le tout avec des titres, sous-titres, cat\u00e9gories th\u00e9matiques et les liens sources.\n\nTon : R\u00e9dige en fran\u00e7ais professionnel, synth\u00e9tique et clair.\n\nLa date du jour est : {{ $now }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Tu es un agent de veille technologique et strat\u00e9gique expert en Intelligence Artificielle.\n\n\ud83c\udfaf MISSION : Chaque semaine, tu dois rechercher, analyser et pr\u00e9senter de fa\u00e7on professionnelle les actualit\u00e9s les plus r\u00e9centes (moins de 7 jours) relatives \u00e0 l'\u00e9cosyst\u00e8me de l'Intelligence Artificielle (IA g\u00e9n\u00e9rative, Machine Learning, r\u00e9gulation, business).\n\nCONTEXTE :\nLe secteur de l'IA \u00e9volue \u00e0 une vitesse fulgurante. Les professionnels, d\u00e9veloppeurs et d\u00e9cideurs doivent rester inform\u00e9s des sorties de nouveaux mod\u00e8les (LLM, diffusion), des outils \u00e9mergents, des mouvements strat\u00e9giques des grands acteurs (OpenAI, Google, Mistral, Meta, etc.) et des \u00e9volutions r\u00e9glementaires (AI Act, copyright).\n\nT\u00c2CHES :\nRechercher les informations pertinentes et v\u00e9rifi\u00e9es publi\u00e9es au cours des 7 derniers jours (port\u00e9e internationale avec une attention particuli\u00e8re aux impacts en France/Europe).\n\nClasser et hi\u00e9rarchiser les informations selon ces cat\u00e9gories :\n\nNouveaux Mod\u00e8les & R&D (Sorties de LLMs, papiers de recherche majeurs, avanc\u00e9es techniques).\n\nOutils & Applications (Mises \u00e0 jour logicielles, APIs, nouveaux cas d'usage concrets).\n\nBusiness & \u00c9cosyst\u00e8me (Lev\u00e9es de fonds, partenariats strat\u00e9giques, mouvements des Big Tech).\n\nR\u00e9gulation, \u00c9thique & S\u00e9curit\u00e9 (AI Act, d\u00e9bats sur les donn\u00e9es, alignement, s\u00e9curit\u00e9).\n\nR\u00e9diger un rapport professionnel, clair et concis.\n\nCiter toutes les sources (titre, m\u00e9dia, date, lien).\n\nFournir uniquement un bloc HTML compatible Gmail (sans <html> ni <head>).\n\nSTYLE :\n\nLangue : Fran\u00e7ais.\n\nTon : Professionnel, technique mais accessible, synth\u00e9tique (style \u201cexecutive summary\u201d).\n\nStructure : Hi\u00e9rarchis\u00e9e, a\u00e9r\u00e9e, lisible sur mobile et Gmail.\n\nFormat : Liens complets et cliquables.\n\nTechnique : Aucune balise <script> ni CSS externe. Utiliser du CSS inline pour le style de base.\n\nLongueur recommand\u00e9e : 700\u2013900 mots maximum.\n\nCOMPORTEMENT :\n\nNe jamais parler de toi ni du mod\u00e8le IA.\n\nNe pas expliquer la m\u00e9thode ou le raisonnement.\n\nSi aucune actualit\u00e9 pertinente n\u2019a \u00e9t\u00e9 publi\u00e9e durant les 7 derniers jours dans une cat\u00e9gorie, ne pas afficher cette cat\u00e9gorie.\n\nSi aucune actualit\u00e9 n'est trouv\u00e9e au global (cas tr\u00e8s rare), indiquer : \u201cAucune avanc\u00e9e majeure ou publication pertinente identifi\u00e9e entre le AAAA-MM-JJ et le AAAA-MM-JJ.\u201d"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        -80,
+        -32
+      ],
+      "id": "4b79a4f3-2738-48d0-a848-fda7f3894ebc",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=En te basant sur tous les textes que je vais te fournir, qui sont des news sur l'actualit\u00e9 de l'Intelligence Artificielle (Tech, Business, R\u00e9gulation), r\u00e9dige un mail a\u00e9r\u00e9, structur\u00e9, hi\u00e9rarchis\u00e9 en texte brut sans superflu.\n\nVoici le contexte :\n{{ $json.text }}\n\nINSTRUCTIONS :\nNe salue pas, entre directement dans le vif du sujet.\n\nRetourne le texte brut au format HTML pour GMAIL.\n\nUtilise des balises <h2>, <h3>, <ul>, <li>, <b> et <a href=\"...\"> pour la structure.\n\nINTERDIT aux balises json, ```html, ou ```.\n\nNE PAS AJOUTER de texte avant ou apr\u00e8s l\u2019objet JSON (ni introduction, ni conclusion hors HTML)."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        272,
+        -32
+      ],
+      "id": "eee58626-49f8-4f2d-b4aa-4a2e75c5d1d7",
+      "name": "Agencement du contexte brut",
+      "credentials": {
+        "anthropicApi": {
+          "id": "7h7iCjgmfwc33UgQ",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "perplexity/sonar-pro",
+        "options": {
+          "maxTokens": 10000,
+          "responseFormat": "text",
+          "temperature": 0.5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        192
+      ],
+      "id": "44074b2e-d391-4c63-924d-7930df830369",
+      "name": "Perplexity Sonar Pro",
+      "credentials": {
+        "openRouterApi": {
+          "id": "V1vjafIa6ffAVKgH",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "wylliam.delaunay@gmail.com",
+        "subject": "=Veille IA du {{ $now.toLocaleString({month: 'long', day: 'numeric', year: 'numeric'}) }}\n",
+        "message": "={{ $json.content[0].text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        640,
+        -32
+      ],
+      "id": "b69236ba-a7d5-4426-a7a5-69f33344a81c",
+      "name": "Send a message",
+      "webhookId": "5938e011-715c-4ef4-bce3-d449abbbe91c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YGGrnzXdc8FzUBqz",
+          "name": "Gmail OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "06fb6617-f3e1-4a18-8f61-c9496bb3d5d6",
+      "name": "D\u00e9clencheur Hebdomadaire",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -368,
+        -32
+      ]
+    }
+  ],
+  "connections": {
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Agencement du contexte brut",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agencement du contexte brut": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perplexity Sonar Pro": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "D\u00e9clencheur Hebdomadaire": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "node:D\u00e9clencheur Quotidien": {
+      "recurrenceRules": []
+    },
+    "node:D\u00e9clencheur Hebdomadaire": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "f6a721af-2b9e-4f1e-923f-70d5a2a68c4b",
+  "activeVersionId": null,
+  "versionCounter": 16,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2025-10-25T16:31:31.619Z",
+      "createdAt": "2025-10-25T16:31:31.619Z",
+      "role": "workflow:owner",
+      "workflowId": "CreZ8UK35hUDZEvk",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

@@ -1,0 +1,23 @@
+#!/bin/bash
+# Gitleaks pre-commit hook — scan every commit for secrets
+# Installed by: scripts/install-hooks.sh
+
+echo "🔍 Scanning for secrets with gitleaks..."
+
+if ! command -v gitleaks &>/dev/null; then
+  echo "⚠️  gitleaks not found — install it first: goreleaser or brew install gitleaks"
+  exit 1
+fi
+
+gitleaks git --pre-commit --config "$PWD/.gitleaks.toml" --verbose 2>&1
+STATUS=$?
+
+if [ $STATUS -ne 0 ]; then
+  echo ""
+  echo "❌ SECRET DÉTECTÉ — commit rejeté."
+  echo "   Si c'est un faux positif, édite .gitleaks.toml pour l'ajouter à l'allowlist."
+  exit 1
+fi
+
+echo "✅ Aucun secret détecté — commit autorisé."
+exit 0

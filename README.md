@@ -2,7 +2,7 @@
 
 Infrastructure reproductible pour KVM2 (le cerveau) : n8n + Hermes + LiteLLM.
 
-> **Statut :** ✅ FIABLE — Test de restauration validé sur KVM1 (16/07/2026)
+> **Statut :** ✅ FIABLE — Test fonctionnel validé sur KVM1 (16/07/2026) : SOPS decrypt ✓, docker-compose up ✓, n8n health check ✓, workflow import ✓
 
 ## Architecture
 
@@ -47,17 +47,20 @@ Sans la clé AGE : impossible de déchiffrer `secrets/.env.enc.env` → impossib
 ```bash
 # 1. VPS vierge (Ubuntu 22.04+), SSH en root
 # 2. Récupérer la clé AGE (password manager)
-# 3. Lancer le restore
-curl -sSfL https://raw.githubusercontent.com/Exawyll/agent-infra/main/scripts/restore.sh | bash -s ~/age-key.txt
+# 3. Lancer le restore (la clé N'EST PAS passée en argument)
+SOPS_AGE_KEY_FILE=~/age-key.txt ./scripts/restore.sh
 ```
 
-Ou manuellement :
+Ou avec --key-file :
 
 ```bash
 git clone https://github.com/Exawyll/agent-infra.git
 cd agent-infra
-./scripts/restore.sh ~/age-key.txt
+SOPS_AGE_KEY_FILE=~/age-key.txt ./scripts/restore.sh
 ```
+
+> ⚠️ La clé AGE ne doit JAMAIS apparaître dans un argument de commande
+> (historique shell, /proc, logs). Utilise SOPS_AGE_KEY_FILE ou --key-file.
 
 ## Déploiement idempotent (composant par composant)
 

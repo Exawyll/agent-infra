@@ -1,29 +1,29 @@
 # LiteLLM Proxy Config — 4 alias : rapide, code, review, raisonnement
-# Toute modification → restart du conteneur LiteLLM
+# Modèles OpenRouter juillet 2026
 
 model_list:
-  # Tâches simples : veille, questions rapides
+  # Rapide : tâches simples, veille — V4 Flash
   - model_name: rapide
     litellm_params:
-      model: openrouter/deepseek/deepseek-chat
+      model: openrouter/deepseek/deepseek-v4-flash
       api_key: os.environ/OPENROUTER_API_KEY
 
-  # Génération de code (daemon dev)
+  # Code : génération et debugging — V4 Flash
   - model_name: code
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
       api_key: os.environ/OPENROUTER_API_KEY
 
-  # Review de code + consolidation (triple review via n8n, alias direct Opus)
+  # Review : code review + consolidation — Opus 4
   - model_name: review
     litellm_params:
-      model: openrouter/anthropic/claude-opus-4
+      model: openrouter/anthropic/claude-opus-4.8
       api_key: os.environ/OPENROUTER_API_KEY
 
-  # Raisonnement complexe : planification, architecture
+  # Raisonnement : planification, architecture — V4 Pro
   - model_name: raisonnement
     litellm_params:
-      model: openrouter/deepseek/deepseek-r1-0528
+      model: openrouter/deepseek/deepseek-v4-pro
       api_key: os.environ/OPENROUTER_API_KEY
 
 litellm_settings:

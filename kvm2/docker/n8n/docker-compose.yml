@@ -29,9 +29,10 @@ services:
     ports:
       - "127.0.0.1:4000:4000"
     environment:
-      - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD}@litellm-postgres:5432/litellm
+      - DATABASE_URL=postgresql://litellm:***@litellm-postgres:5432/litellm
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
     volumes:
       - litellm_configs:/app/db
       - ./litellm-config.yaml:/app/config.yaml:ro

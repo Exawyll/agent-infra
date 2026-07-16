@@ -1,36 +1,53 @@
-# LiteLLM Proxy Config — 4 alias : rapide, code, review, raisonnement
-# Toute modification → restart du conteneur LiteLLM
+# LiteLLM Proxy Config — Migration API DeepSeek directe
+# rapide → V4 Flash (DeepSeek direct)
+# code   → V4 Pro (DeepSeek direct, fallback → rapide)
+# review → Claude Opus 4.8 (OpenRouter, inchangé)
+# raisonnement → V4 Pro (DeepSeek direct)
 
 model_list:
-  # Tâches simples : veille, questions rapides
+  # Rapide : tâches simples, veille — V4 Flash direct
   - model_name: rapide
     litellm_params:
-      model: openrouter/deepseek/deepseek-chat
-      api_key: os.environ/OPENROUTER_API_KEY
+      model: deepseek/deepseek-v4-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+      input_cost_per_token: 0.00000014
+      output_cost_per_token: 0.00000028
 
-  # Génération de code (daemon dev)
+  # Code : génération et debugging — V4 Pro direct
   - model_name: code
     litellm_params:
-      model: openrouter/deepseek/deepseek-v4-flash
-      api_key: os.environ/OPENROUTER_API_KEY
+      model: deepseek/deepseek-v4-pro
+      api_key: os.environ/DEEPSEEK_API_KEY
+      input_cost_per_token: 0.000000435
+      output_cost_per_token: 0.00000087
+    fallbacks:
+      - rapide
 
-  # Review de code + consolidation (triple review via n8n, alias direct Opus)
+  # Review : code review + consolidation — Opus 4.8 (OpenRouter)
   - model_name: review
     litellm_params:
-      model: openrouter/anthropic/claude-opus-4
+      model: openrouter/anthropic/claude-opus-4.8
       api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.000005
+      output_cost_per_token: 0.000025
 
-  # Raisonnement complexe : planification, architecture
+  # Raisonnement : planification, architecture — V4 Pro direct
   - model_name: raisonnement
     litellm_params:
-      model: openrouter/deepseek/deepseek-r1-0528
-      api_key: os.environ/OPENROUTER_API_KEY
+      model: deepseek/deepseek-v4-pro
+      api_key: os.environ/DEEPSEEK_API_KEY
+      input_cost_per_token: 0.000000435
+      output_cost_per_token: 0.00000087
 
 litellm_settings:
   drop_params: true
   set_verbose: false
   num_retries: 2
   request_timeout: 600
+  cache: true
+  cache_params:
+    type: s2
+    mode: default
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

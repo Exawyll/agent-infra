@@ -94,6 +94,8 @@ services:
       - NOTION_STATE_DB=${NOTION_STATE_DB}
       - NOTION_DECISIONS_DB=${NOTION_DECISIONS_DB}
       - PO_EMAIL=${PO_EMAIL}
+      - HERMES_WEBHOOK_SIGNATURE=${HERMES_WEBHOOK_SIGNATURE}
+      - HERMES_GATEWAY_URL=${HERMES_GATEWAY_URL}
     volumes:
       - n8n_data:/home/node/.n8n
       - /local-files:/files

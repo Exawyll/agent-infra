@@ -1,0 +1,129 @@
+{
+  "updatedAt": "2026-06-30T10:13:19.796Z",
+  "createdAt": "2026-06-27T12:59:08.909Z",
+  "id": "4cYeYpHt0NYPDwvc",
+  "name": "Teams Auto-Closure",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "9cd0e56a-25ea-4761-9f20-059581fff61f"
+    },
+    {
+      "name": "Fetch en cours",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst res = await this.helpers.httpRequest({method:'POST',url:'https://api.notion.com/v1/databases/38c15cc8-89a0-81b3-9890-cee60d8a9ab0/query',headers:{'Authorization':'Bearer PLACEHOLDER_NOTION_TOKEN_SOPS','Notion-Version':'2022-06-28'},body:{filter:{and:[{property:'Statut',select:{equals:'🟡 En cours'}},{property:'Ne pas promouvoir',checkbox:{equals:false}}]},page_size:50}});\nconst items = (res.results||[]).map(function(p){var pr=p.properties;var hrs=pr['Dernière activité']?.date?.start?(now-new Date(pr['Dernière activité']?.date?.start))/(1000*60*60):999;var li=pr['Dernier intervenant']?.select?.name;var d='skip',s='',r='';if(li==='Wylliam'&&hrs>24){d='close';s='✅ Clos';r='Repondu'}else if(li==='Autre'&&hrs>48){d='promote';s='🔴 À promouvoir';r='Pas de réponse'}return{pageId:p.id,decision:d,newStatus:s,reason:r,chatId:pr['Conversation ID']?.rich_text?.[0]?.plain_text||'',resume:pr['Résumé']?.rich_text?.[0]?.plain_text||'',lien:pr['Lien Teams']?.url||'',hrs:Math.round(hrs)};}).filter(function(i){return i.decision!=='skip'});\nreturn items;"
+      },
+      "id": "157648c4-726d-46a4-8c93-82548b9b7a60"
+    },
+    {
+      "name": "Update status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "jsCode": "var items = $input.all();\nvar results = [];\nfor (var idx=0; idx<items.length; idx++) {var item=items[idx].json;var pageId=item.pageId;var decision=item.decision;var newStatus=item.newStatus;var resume=item.resume||'';var lien=item.lien||'';\nawait this.helpers.httpRequest({method:'PATCH',url:'https://api.notion.com/v1/pages/'+pageId,headers:{'Authorization':'Bearer PLACEHOLDER_NOTION_TOKEN_SOPS','Notion-Version':'2022-06-28'},body:{properties:{'Statut':{select:{name:newStatus}}}}});\nresults.push({pageId:pageId,decision:decision,newStatus:newStatus});\nif (decision==='promote'){await this.helpers.httpRequest({method:'POST',url:'https://api.notion.com/v1/pages',headers:{'Authorization':'Bearer PLACEHOLDER_NOTION_TOKEN_SOPS','Notion-Version':'2022-06-28'},body:{parent:{database_id:'6b279b50-1f54-4b57-b96d-919c5f667730'},properties:{'Capture':{title:[{text:{content:(resume||'Action Teams').substring(0,100)}}]},'Source':{select:{name:'💬 Teams'}},'Lien Source':{url:lien||null},'Action':{select:{name:'➡️ Faire'}},'Notes':{rich_text:[{text:{content:(resume||'').substring(0,1900)}}]}}}});}}return results;"
+      },
+      "id": "2bce6584-1151-4f8f-a98c-f53ce76650aa"
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Fetch en cours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch en cours": {
+      "main": [
+        [
+          {
+            "node": "Update status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Schedule": {
+      "recurrenceRules": [
+        0
+      ],
+      "recurrenceRuleSignatures": [
+        "hours:24"
+      ]
+    }
+  },
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "versionId": "c9c2c5a8-6f3a-46e3-9fdd-5bf81286c01f",
+  "activeVersionId": "c9c2c5a8-6f3a-46e3-9fdd-5bf81286c01f",
+  "versionCounter": 38,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-27T12:59:08.912Z",
+      "createdAt": "2026-06-27T12:59:08.912Z",
+      "role": "workflow:owner",
+      "workflowId": "4cYeYpHt0NYPDwvc",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

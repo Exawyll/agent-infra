@@ -1,0 +1,430 @@
+{
+  "updatedAt": "2026-04-17T07:14:31.961Z",
+  "createdAt": "2026-03-24T14:12:59.300Z",
+  "id": "95WTFfX3fyKggYKZwufau",
+  "name": "Nettoyage mensuel Calendrier Outlook",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 28 * *"
+            }
+          ]
+        }
+      },
+      "name": "Cron 28 du mois",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -848,
+        112
+      ],
+      "id": "688fccaf-719a-443a-a761-4f8b7f2d1014"
+    },
+    {
+      "parameters": {
+        "jsCode": "const limit = new Date();\nlimit.setDate(limit.getDate() - 7);\nreturn [{ json: { dateLimite: limit.toISOString() } }];"
+      },
+      "name": "Calcul date limite",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        112
+      ],
+      "id": "a43ff9d9-06a0-40a1-85b8-5136cf90e50d"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "id": "8b89cfb4-5f1d-44d6-ad7b-27017e563616"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Pages à supprimer ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        112
+      ],
+      "id": "7d3c1063-51da-4142-81c2-bee74c16ac37"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "{\"archived\": true}",
+        "options": {}
+      },
+      "name": "Archiver via API Notion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        16,
+        16
+      ],
+      "id": "dfc1e20a-852f-4d9d-a520-b4f626c87aec",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "sZ02XZjOJSMbTCPO",
+          "name": "Atlassian Creds"
+        },
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "37ac8c1d-9420-45a2-8d2c-fc8ed8d74aac",
+          "mode": "list",
+          "cachedResultName": "📅 Calendrier Outlook",
+          "cachedResultUrl": "https://www.notion.so/37ac8c1d942045a28d2cfc8ed8d74aac"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Statut Sync|select",
+              "condition": "equals",
+              "selectValue": "🗑️ Supprimé"
+            },
+            {
+              "key": "Fin|date",
+              "condition": "before",
+              "date": "={{ $('Calcul date limite').item.json.dateLimite }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Chercher pages calendar à supprimer",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        -48
+      ],
+      "id": "b81aadde-9c33-410c-a38a-f01a94205360",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "f9c668a1-573e-4fcc-83cf-875f1ed90ed9",
+          "mode": "list",
+          "cachedResultName": "📬 Veille Mail",
+          "cachedResultUrl": "https://www.notion.so/f9c668a1573e4fcc83cf875f1ed90ed9"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Date de réception|date",
+              "condition": "before",
+              "date": "={{ $('Calcul date limite').item.json.dateLimite }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Chercher pages veille Mail à supprimer",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        176
+      ],
+      "id": "7c52ced3-adf3-4e57-be67-c5cc93314d51",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "6b279b50-1f54-4b57-b96d-919c5f667730",
+          "mode": "list",
+          "cachedResultName": "📥 Inbox GTD",
+          "cachedResultUrl": "https://www.notion.so/6b279b501f544b57b96d919c5f667730"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Traité|checkbox",
+              "condition": "equals",
+              "checkboxValue": true
+            },
+            {
+              "key": "Date Capture|created_time",
+              "condition": "before",
+              "createdTimeValue": "={{ $json.dateLimite }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Chercher pages Inbox GTD",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        -256
+      ],
+      "id": "26035913-5428-4cef-91b9-455d9c3e5fa8",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "841bb4be-dfa2-4f6f-bd7d-07c18b54975f",
+          "mode": "list",
+          "cachedResultName": "Tâches",
+          "cachedResultUrl": "https://www.notion.so/841bb4bedfa24f6fbd7d07c18b54975f"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Statut|select",
+              "condition": "equals",
+              "selectValue": "✅ Terminé"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Chercher pages veille Mail à supprimer1",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        400
+      ],
+      "id": "556756d6-99ec-46db-b035-af664f3a46cf",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron 28 du mois": {
+      "main": [
+        [
+          {
+            "node": "Calcul date limite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcul date limite": {
+      "main": [
+        [
+          {
+            "node": "Chercher pages calendar à supprimer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Chercher pages veille Mail à supprimer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Chercher pages Inbox GTD",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Chercher pages veille Mail à supprimer1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pages à supprimer ?": {
+      "main": [
+        [
+          {
+            "node": "Archiver via API Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chercher pages calendar à supprimer": {
+      "main": [
+        [
+          {
+            "node": "Pages à supprimer ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chercher pages veille Mail à supprimer": {
+      "main": [
+        [
+          {
+            "node": "Pages à supprimer ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chercher pages Inbox GTD": {
+      "main": [
+        [
+          {
+            "node": "Pages à supprimer ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chercher pages veille Mail à supprimer1": {
+      "main": [
+        [
+          {
+            "node": "Pages à supprimer ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "node:Cron 28 du mois": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "a253e50e-2ce5-4720-bbf3-6597bf26b1b6",
+  "activeVersionId": "34275858-c4aa-4a6e-8dfa-c2ee9223ce2f",
+  "versionCounter": 36,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-03-24T14:12:59.303Z",
+      "createdAt": "2026-03-24T14:12:59.303Z",
+      "role": "workflow:owner",
+      "workflowId": "95WTFfX3fyKggYKZwufau",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

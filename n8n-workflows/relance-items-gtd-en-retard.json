@@ -61,7 +61,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\"filter\":{\"property\":\"Trait\u00e9\",\"checkbox\":{\"equals\":false}},\"page_size\":100}",
+        "jsonBody": "{\"filter\":{\"property\":\"Traité\",\"checkbox\":{\"equals\":false}},\"page_size\":100}",
         "options": {}
       },
       "credentials": {
@@ -81,7 +81,7 @@
         -400
       ],
       "parameters": {
-        "jsCode": "const results = $input.item.json.results || [];\nconst now = new Date();\nconst sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\n\nconst overdue = results.filter(function(page) {\n  const props = page.properties;\n  if (!props) return false;\n  const action = props['Action'] && props['Action'].select ? props['Action'].select.name : '';\n  const traite = props['Trait\u00e9'] ? props['Trait\u00e9'].checkbox : false;\n  const dateCapture = new Date(props['Date Capture'] ? props['Date Capture'].created_time : page.created_time);\n  return action === '\\u27A1\\uFE0F Faire' && !traite && dateCapture < sevenDaysAgo;\n});\n\nif (overdue.length === 0) {\n  return [{ json: { count: 0, lines: 'Aucun item en retard cette semaine.' } }];\n}\n\nconst lines = overdue.map(function(page) {\n  const props = page.properties;\n  const titre = props['Capture'] && props['Capture'].title ? props['Capture'].title.map(function(t) { return t.plain_text; }).join('') : 'Sans titre';\n  const dateCapture = new Date(props['Date Capture'] ? props['Date Capture'].created_time : page.created_time);\n  const ageDays = Math.floor((now - dateCapture) / (1000 * 60 * 60 * 24));\n  return '\u2022 ' + titre + ' (J+' + ageDays + ')';\n});\n\nconst dateStr = now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });\nconst summary = dateStr + ' \\u2014 ' + overdue.length + ' action(s) Faire en attente depuis +7j :\\n\\n' + lines.join('\\n');\n\nreturn [{ json: { count: overdue.length, lines: summary } }];"
+        "jsCode": "const results = $input.item.json.results || [];\nconst now = new Date();\nconst sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\n\nconst overdue = results.filter(function(page) {\n  const props = page.properties;\n  if (!props) return false;\n  const action = props['Action'] && props['Action'].select ? props['Action'].select.name : '';\n  const traite = props['Traité'] ? props['Traité'].checkbox : false;\n  const dateCapture = new Date(props['Date Capture'] ? props['Date Capture'].created_time : page.created_time);\n  return action === '\\u27A1\\uFE0F Faire' && !traite && dateCapture < sevenDaysAgo;\n});\n\nif (overdue.length === 0) {\n  return [{ json: { count: 0, lines: 'Aucun item en retard cette semaine.' } }];\n}\n\nconst lines = overdue.map(function(page) {\n  const props = page.properties;\n  const titre = props['Capture'] && props['Capture'].title ? props['Capture'].title.map(function(t) { return t.plain_text; }).join('') : 'Sans titre';\n  const dateCapture = new Date(props['Date Capture'] ? props['Date Capture'].created_time : page.created_time);\n  const ageDays = Math.floor((now - dateCapture) / (1000 * 60 * 60 * 24));\n  return '• ' + titre + ' (J+' + ageDays + ')';\n});\n\nconst dateStr = now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });\nconst summary = dateStr + ' \\u2014 ' + overdue.length + ' action(s) Faire en attente depuis +7j :\\n\\n' + lines.join('\\n');\n\nreturn [{ json: { count: overdue.length, lines: summary } }];"
       }
     },
     {
@@ -120,7 +120,7 @@
     },
     {
       "id": "374056f6-3ab5-44dd-968b-f23c0a9f3f3b",
-      "name": "Cr\u00e9er entr\u00e9e Relance",
+      "name": "Créer entrée Relance",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
       "position": [
@@ -133,18 +133,18 @@
           "__rl": true,
           "value": "6b279b50-1f54-4b57-b96d-919c5f667730",
           "mode": "list",
-          "cachedResultName": "\ud83d\udce5 Inbox GTD"
+          "cachedResultName": "📥 Inbox GTD"
         },
-        "title": "=\ud83d\udcec Relance hebdo \u2014 {{ $json.count }} items Faire en attente",
+        "title": "=📬 Relance hebdo — {{ $json.count }} items Faire en attente",
         "propertiesUi": {
           "propertyValues": [
             {
               "key": "Source|select",
-              "selectValue": "\ud83d\udd00 Autre"
+              "selectValue": "🔀 Autre"
             },
             {
               "key": "Action|select",
-              "selectValue": "\u27a1\ufe0f Faire"
+              "selectValue": "➡️ Faire"
             },
             {
               "key": "Notes|rich_text",
@@ -152,7 +152,7 @@
             },
             {
               "key": "Confiance|select",
-              "selectValue": "\u2705 Certain"
+              "selectValue": "✅ Certain"
             }
           ]
         },
@@ -204,7 +204,7 @@
       "main": [
         [
           {
-            "node": "Cr\u00e9er entr\u00e9e Relance",
+            "node": "Créer entrée Relance",
             "type": "main",
             "index": 0
           }
@@ -232,6 +232,7 @@
   "versionCounter": 14,
   "triggerCount": 1,
   "sourceWorkflowId": null,
+  "tags": [],
   "shared": [
     {
       "updatedAt": "2026-06-11T15:40:11.308Z",
@@ -252,6 +253,8 @@
       }
     }
   ],
-  "tags": [],
-  "activeVersion": null
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
 }

@@ -1,0 +1,1068 @@
+{
+  "updatedAt": "2025-11-07T13:41:38.000Z",
+  "createdAt": "2025-10-26T14:42:05.528Z",
+  "id": "st7YPts0z3TxRs4q",
+  "name": "RAG Facturation Electronique",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Telegram Trigger').item.json.message.text ?? $('Transcribe Audio').item.json.text }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        -208,
+        -192
+      ],
+      "id": "c6f95e35-35d8-40bb-b5dd-6ffe334c2a68",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "nRkanyxpsQ1QcEtv",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -400,
+        -192
+      ],
+      "id": "ac27e211-9e3f-4211-8425-c7cfaf56e3c7",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "7h7iCjgmfwc33UgQ",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1552,
+        368
+      ],
+      "id": "1606bece-e979-43ee-a7d4-4bc8734d6ee4",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "cZJg7tCb3YEl2Af1",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.text || $json.data || $json.concatenated_data }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "file_id",
+                "value": "={{ $('Set File Id').item.json.file_id }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1744,
+        384
+      ],
+      "id": "df5e2e1e-fb70-447c-95b3-fbe1af7411af",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1712,
+        560
+      ],
+      "id": "cb773605-f336-4570-ac71-2d1c7634686d",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "1QlVkf70XDxIOrqgN9373RT6bQFqbZdko",
+          "mode": "list",
+          "cachedResultName": "RAG - RFE",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1QlVkf70XDxIOrqgN9373RT6bQFqbZdko"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        48
+      ],
+      "id": "62b967c4-f55c-44be-af7c-48f656ce6c40",
+      "name": "Google Drive Trigger",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "LpjmILHA1NSkcpfk",
+          "name": "Google Drive OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "1QlVkf70XDxIOrqgN9373RT6bQFqbZdko",
+          "mode": "list",
+          "cachedResultName": "RAG - RFE",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1QlVkf70XDxIOrqgN9373RT6bQFqbZdko"
+        },
+        "event": "fileUpdated",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        272
+      ],
+      "id": "f4c4125e-e787-4f9f-b8c9-eaacc11cefe3",
+      "name": "Google Drive Trigger1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "LpjmILHA1NSkcpfk",
+          "name": "Google Drive OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "documents",
+        "filterType": "string",
+        "filterString": "=metadata->>file_id=like.*{{ $json.file_id }}*"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        176
+      ],
+      "id": "15e13099-38c9-44cf-a029-ff257ab72af6",
+      "name": "Delete a row",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "z6NEOm1JD0MObn2p",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "594c186e-038e-457c-a9df-7c214866c77e",
+              "name": "file_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "f749f7ea-dcfa-431e-82b8-45bfa51664a9",
+              "name": "file_type",
+              "value": "={{ $json.mimeType }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -976,
+        176
+      ],
+      "id": "d1356d5e-85c3-46fc-ae1e-548b256a3a0f",
+      "name": "Set File Id"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Set File Id').item.json.file_id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -560,
+        176
+      ],
+      "id": "32782487-0bab-42ba-9fa4-6d8b57ef62df",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "LpjmILHA1NSkcpfk",
+          "name": "Google Drive OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Set File Id').item.json.file_type }}",
+                    "rightValue": "application/pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "97f1bd51-83eb-4e74-bf54-0136bf8e74a9"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PDF"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7257561d-0a7b-4835-b162-b38c7bbd43ea",
+                    "leftValue": "={{ $('Set File Id').item.json.file_type }}",
+                    "rightValue": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Excel"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "09e7af63-d9db-4814-bb13-3a8fb9afaf68",
+                    "leftValue": "={{ $('Set File Id').item.json.file_type }}",
+                    "rightValue": "application/xml",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "XML"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -352,
+        176
+      ],
+      "id": "de810b76-d1fe-4acd-9a4f-f552382a99b9",
+      "name": "Switch",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "operation": "xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        688,
+        448
+      ],
+      "id": "9e82a521-80f4-4fde-ab4a-6c8f4fe109b0",
+      "name": "Extract from XML"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        688,
+        80
+      ],
+      "id": "8e918081-0dec-426d-ae4b-4e2739ad5b46",
+      "name": "Extract from PDF"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        688,
+        656
+      ],
+      "id": "2cf0808b-fe39-4739-8cd1-e9de7319d5d3",
+      "name": "Extract from TXT File"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {
+          "queryName": "match_documents"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        1616,
+        176
+      ],
+      "id": "835505db-8a4a-401f-9ee7-262c11cd65ca",
+      "name": "Supabase Store Document",
+      "credentials": {
+        "supabaseApi": {
+          "id": "z6NEOm1JD0MObn2p",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Utilise cet outil pour n'importe quelle requête.",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        64,
+        -192
+      ],
+      "id": "4d10b38e-57fb-4f52-a5ca-31a985ea85b3",
+      "name": "Supabase Consult Document",
+      "credentials": {
+        "supabaseApi": {
+          "id": "z6NEOm1JD0MObn2p",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        160,
+        16
+      ],
+      "id": "067df5ef-58ff-4f2a-aa06-c6ef37845151",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "cZJg7tCb3YEl2Af1",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        672,
+        256
+      ],
+      "id": "a592c746-8fed-4261-8954-8fe9e392c5a6",
+      "name": "Extract from XLSX"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        880,
+        256
+      ],
+      "id": "40df1f40-f513-4015-8278-bd9e77c8ea0f",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "fieldsToSummarize": {
+          "values": [
+            {
+              "aggregation": "concatenate",
+              "field": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.summarize",
+      "typeVersion": 1.1,
+      "position": [
+        1088,
+        256
+      ],
+      "id": "ec8f2ca0-036a-4b90-b89d-63b50c6dfff9",
+      "name": "Summarize"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "Donne moi 1 minute ...",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1376,
+        -432
+      ],
+      "id": "f2f856bf-2b83-4084-a537-424dbcbb26c4",
+      "name": "Send a text message",
+      "webhookId": "a5769cbe-dde3-43d6-b1a2-e89b44d4a1b4",
+      "credentials": {
+        "telegramApi": {
+          "id": "Dv3t4Xfl9b25wku5",
+          "name": "pdp_nexcer_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Telegram Trigger').item.json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -992,
+        -336
+      ],
+      "id": "f2973608-07af-41b2-9c94-d9ef663bf192",
+      "name": "Get audio file",
+      "webhookId": "816df25f-ca13-4e4d-94e2-6f6bf8c6e08b",
+      "credentials": {
+        "telegramApi": {
+          "id": "ihZuIM3ZQcKsWsu9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -784,
+        -336
+      ],
+      "id": "c8dd3e9a-c988-4772-b069-123a6bd14e98",
+      "name": "Transcribe Audio",
+      "credentials": {
+        "openAiApi": {
+          "id": "cZJg7tCb3YEl2Af1",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1600,
+        -432
+      ],
+      "id": "9d1a7438-cad2-43d7-a40e-c75373079f08",
+      "name": "Telegram Trigger",
+      "webhookId": "d5159635-c742-4e21-9894-d92dc9e9c828",
+      "credentials": {
+        "telegramApi": {
+          "id": "Dv3t4Xfl9b25wku5",
+          "name": "pdp_nexcer_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.voice.file_id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notExists",
+                      "singleValue": true
+                    },
+                    "id": "b8cfed5f-d4c4-4f29-b735-81c2db137aa6"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Texte"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "be9554ba-23a5-4d8c-8b0c-a6c1216413cb",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.voice.file_id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Audio"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1200,
+        -432
+      ],
+      "id": "0da30971-1b99-415a-8a35-d5618f9a653e",
+      "name": "Texte/Audio"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Telegram Trigger').item.json.message.text ?? $('Transcribe Audio').item.json.text }}",
+        "options": {
+          "systemMessage": "=Tu es FacturoBot, un expert de la réforme de la facturation électronique française (loi 2024–2026, e-invoicing & e-reporting).\n\n---\n\n## Objectif\nRépondre avec exactitude et clarté aux questions liées à la réforme française de la facturation électronique, en t’appuyant sur les spécifications officielles disponibles dans ta base Supabase.\n\n---\n\n## Règles de fonctionnement\n\n1. Analyse la requête utilisateur pour identifier le sujet et le besoin.  \n2. Interroge Supabase pour trouver les extraits officiels pertinents.  \n3. Synthétise la réponse de manière professionnelle et conforme à la réglementation.  \n4. Formate toujours la sortie finale comme un message Telegram (MarkdownV2 activé).\nIMPORTANT :\nTu ne dois effectuer qu'une seule exécution d'outil (requête Supabase) avant de formater le message Telegram.\nNe boucle jamais, ne tente pas de réanalyser la même question plusieurs fois.\n\n---\n\n## Format de sortie obligatoire\n\nExemple de message Telegram :\n\n*Réponse :*  \nLes entreprises non assujetties à la TVA ne sont pas tenues d’émettre de factures électroniques via le dispositif e-invoicing, mais peuvent en recevoir dès 2026\\.  \n\n_Source : DGFiP – Guide de la réforme, section 2\\.3_\n\n---\n\n## Si aucune source officielle n’est trouvée\n_Aucune référence officielle trouvée dans la base Supabase pour cette question\\._\n\n---\n\n## Style\n- Clair, professionnel, synthétique  \n- Conformité avec la terminologie DGFiP / FNFE-MPE  \n- Pas d’opinions personnelles, uniquement des données officielles"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -272,
+        -400
+      ],
+      "id": "1bcdf7ca-ce95-4fb0-ad1e-de0f0f423021",
+      "name": "PDP_AGENT"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $('PDP_AGENT').item.json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        304,
+        -400
+      ],
+      "id": "3670b81d-2449-4a14-b18b-0e066a908783",
+      "name": "Response",
+      "webhookId": "b177fc93-1559-4c75-84f2-2000898ce673",
+      "credentials": {
+        "telegramApi": {
+          "id": "Dv3t4Xfl9b25wku5",
+          "name": "pdp_nexcer_bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "PDP_AGENT",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "PDP_AGENT",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Store Document",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Store Document",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set File Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Set File Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set File Id": {
+      "main": [
+        [
+          {
+            "node": "Delete a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete a row": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Extract from PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from XLSX",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from XML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from TXT File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from PDF": {
+      "main": [
+        [
+          {
+            "node": "Supabase Store Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Consult Document": {
+      "ai_tool": [
+        [
+          {
+            "node": "PDP_AGENT",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Consult Document",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from TXT File": {
+      "main": [
+        [
+          {
+            "node": "Supabase Store Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from XML": {
+      "main": [
+        [
+          {
+            "node": "Supabase Store Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from XLSX": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize": {
+      "main": [
+        [
+          {
+            "node": "Supabase Store Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Texte/Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get audio file": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Audio": {
+      "main": [
+        [
+          {
+            "node": "PDP_AGENT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Texte/Audio": {
+      "main": [
+        [
+          {
+            "node": "PDP_AGENT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get audio file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDP_AGENT": {
+      "main": [
+        [
+          {
+            "node": "Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "node:Google Drive Trigger": {
+      "lastTimeChecked": "2026-01-10T17:28:53Z"
+    },
+    "node:Google Drive Trigger1": {
+      "lastTimeChecked": "2026-01-10T17:28:54Z"
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "dd988690-f101-45ba-ac2d-b353ac31ba6a",
+  "activeVersionId": null,
+  "versionCounter": 9,
+  "triggerCount": 3,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2025-10-26T14:42:05.531Z",
+      "createdAt": "2025-10-26T14:42:05.531Z",
+      "role": "workflow:owner",
+      "workflowId": "st7YPts0z3TxRs4q",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

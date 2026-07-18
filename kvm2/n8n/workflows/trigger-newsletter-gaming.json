@@ -1,6 +1,10 @@
 {
+  "updatedAt": "2026-07-16T20:27:25.995Z",
+  "createdAt": "2026-07-16T20:27:25.995Z",
+  "id": "sboxO8R43rAfIKqF",
   "name": "trigger-newsletter-gaming",
-  "description": "",
+  "description": null,
+  "active": true,
   "isArchived": false,
   "nodes": [
     {
@@ -34,7 +38,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.HERMES_GATEWAY_URL }}/webhooks/newsletter-gaming",
+        "url": "http://100.106.174.46:8644/webhooks/newsletter-gaming",
         "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
@@ -83,18 +87,9 @@
                 "type": "number",
                 "operation": "largerEqual"
               }
-            },
-            {
-              "id": "status-undefined",
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "isEmpty"
-              }
             }
           ],
-          "combinator": "or"
+          "combinator": "and"
         },
         "looseTypeValidation": true,
         "options": {}
@@ -173,187 +168,37 @@
       ]
     }
   },
+  "meta": null,
   "nodeGroups": [],
   "pinData": null,
+  "versionId": "69af6862-216c-4cff-87da-821587cbefcb",
+  "activeVersionId": "69af6862-216c-4cff-87da-821587cbefcb",
+  "versionCounter": 1,
   "triggerCount": 1,
   "sourceWorkflowId": null,
-  "activeVersion": {
-    "updatedAt": "2026-07-16T20:27:25.998Z",
-    "createdAt": "2026-07-16T20:27:25.998Z",
-    "versionId": "69af6862-216c-4cff-87da-821587cbefcb",
-    "workflowId": "sboxO8R43rAfIKqF",
-    "nodes": [
-      {
-        "id": "schedule-2",
-        "name": "Schedule 9h UTC 15/30",
-        "type": "n8n-nodes-base.scheduleTrigger",
-        "typeVersion": 1.3,
-        "position": [
-          0,
-          0
-        ],
-        "parameters": {
-          "rule": {
-            "interval": [
-              {
-                "field": "cronExpression",
-                "expression": "0 9 15,30 * *"
-              }
-            ]
-          }
-        }
-      },
-      {
-        "id": "http-2",
-        "name": "POST gaming webhook",
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.2,
-        "position": [
-          300,
-          0
-        ],
-        "parameters": {
-          "method": "POST",
-          "url": "={{ $env.HERMES_GATEWAY_URL }}/webhooks/newsletter-gaming",
-          "authentication": "none",
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "X-Hub-Signature-256",
-                "value": "={{ $env.HERMES_WEBHOOK_SIGNATURE }}"
-              },
-              {
-                "name": "Content-Type",
-                "value": "application/json"
-              }
-            ]
-          },
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "{}",
-          "options": {
-            "continueOnFail": true
-          }
-        }
-      },
-      {
-        "id": "if-2",
-        "name": "Erreur ?",
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3,
-        "position": [
-          600,
-          0
-        ],
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "loose",
-              "version": 3
-            },
-            "conditions": [
-              {
-                "id": "status-err",
-                "leftValue": "={{ $json.statusCode }}",
-                "rightValue": 400,
-                "operator": {
-                  "type": "number",
-                  "operation": "largerEqual"
-                }
-              },
-              {
-                "id": "status-undefined",
-                "leftValue": "={{ $json.statusCode }}",
-                "rightValue": "",
-                "operator": {
-                  "type": "string",
-                  "operation": "isEmpty"
-                }
-              }
-            ],
-            "combinator": "or"
-          },
-          "looseTypeValidation": true,
-          "options": {}
-        }
-      },
-      {
-        "id": "tg-2",
-        "name": "Alerte Telegram",
-        "type": "n8n-nodes-base.telegram",
-        "typeVersion": 2,
-        "position": [
-          900,
-          100
-        ],
-        "parameters": {
-          "resource": "message",
-          "operation": "sendMessage",
-          "chatId": "8262789577",
-          "text": "=🚨 *ÉCHEC — Newsletter Gaming*\n\nLe webhook Hermes `newsletter-gaming` n'a pas répondu.\n\n- Statut HTTP : `{{ $json.statusCode }}`\n- Erreur : {{ $json.error || 'pas de détail' }}\n- Horodatage : {{ $now }}"
-        },
-        "credentials": {
-          "telegramApi": {
-            "id": "ihZuIM3ZQcKsWsu9",
-            "name": "Telegram account"
-          }
-        },
-        "webhookId": "ff3363c3-eabf-49a6-81fa-117eb6783528"
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-07-16T20:27:25.996Z",
+      "createdAt": "2026-07-16T20:27:25.996Z",
+      "role": "workflow:owner",
+      "workflowId": "sboxO8R43rAfIKqF",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
       }
-    ],
-    "connections": {
-      "Schedule 9h UTC 15/30": {
-        "main": [
-          [
-            {
-              "node": "POST gaming webhook",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "POST gaming webhook": {
-        "main": [
-          [
-            {
-              "node": "Erreur ?",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Erreur ?": {
-        "main": [
-          [
-            {
-              "node": "Alerte Telegram",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          []
-        ]
-      }
-    },
-    "nodeGroups": [],
-    "authors": "Wylliam Delaunay",
+    }
+  ],
+  "versionMetadata": {
     "name": null,
-    "description": null,
-    "autosaved": false,
-    "workflowPublishHistory": [
-      {
-        "createdAt": "2026-07-16T20:27:59.761Z",
-        "id": 291,
-        "workflowId": "sboxO8R43rAfIKqF",
-        "versionId": "69af6862-216c-4cff-87da-821587cbefcb",
-        "event": "activated",
-        "userId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
-      }
-    ]
+    "description": null
   }
 }

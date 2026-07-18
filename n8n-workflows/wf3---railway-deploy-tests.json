@@ -1,0 +1,197 @@
+{
+  "updatedAt": "2026-07-10T16:13:09.713Z",
+  "createdAt": "2026-07-10T15:48:12.047Z",
+  "id": "g5sr1vgFO3t3KUAa",
+  "name": "WF3 - Railway Deploy Tests",
+  "description": "",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "railway-deploy",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "webhookId": "9fc8af1d-2717-468f-8e6c-623a725bd31c"
+    },
+    {
+      "id": "n2",
+      "name": "Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        450,
+        250
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json['details']['status']}}",
+              "operation": "equal",
+              "value2": "SUCCESS"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Notify Hermes",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 2,
+      "position": [
+        650,
+        150
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "8262789577",
+        "text": "= LANCEMENT TESTS POST-DEPLOIEMENT\nService: $json['resource']['service']['name']\nCommit: $json['details']['commitMessage']"
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "ihZuIM3ZQcKsWsu9",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "cfef1c41-f5de-44fe-9d3f-5b0e3bbb38cc"
+    },
+    {
+      "id": "n4",
+      "name": "Failure?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        450,
+        500
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json['details']['status']}}",
+              "operation": "notEqual",
+              "value2": "SUCCESS"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n5",
+      "name": "Alert Echec",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 2,
+      "position": [
+        650,
+        550
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "8262789577",
+        "text": "= ECHEC $json['resource']['service']['name']\nStatus: $json['details']['status']"
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "ihZuIM3ZQcKsWsu9",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "968314fd-ec64-411d-9149-a395be870faf"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success?": {
+      "main": [
+        [
+          {
+            "node": "Notify Hermes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Failure?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Failure?": {
+      "main": [
+        [
+          {
+            "node": "Alert Echec",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "versionId": "3c1ea331-40cf-42f4-a561-1f3b7c379800",
+  "activeVersionId": "3c1ea331-40cf-42f4-a561-1f3b7c379800",
+  "versionCounter": 23,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-07-10T15:48:12.050Z",
+      "createdAt": "2026-07-10T15:48:12.050Z",
+      "role": "workflow:owner",
+      "workflowId": "g5sr1vgFO3t3KUAa",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

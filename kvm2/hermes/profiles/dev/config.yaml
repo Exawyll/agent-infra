@@ -1,9 +1,9 @@
 # Hermes Profile — Dev (Code Review & Development)
-# Clé : agent-dev → modèles code + review
+# Mode : rapide (défaut) + review (code review)
 # Base URL : http://127.0.0.1:4000/v1 (LiteLLM)
 
 model:
-  default: code
+  default: rapide
   provider: litellm-dev
   base_url: http://127.0.0.1:4000/v1
 
@@ -73,6 +73,23 @@ telegram:
   extra:
     rich_messages: true
     rich_drafts: false
+
+
+moa:
+  default_preset: code-review
+  active_preset: code-review
+  presets:
+    code-review:
+      enabled: true
+      reference_models:
+        - provider: litellm-dev
+          model: review
+      aggregator:
+        provider: litellm-dev
+        model: review
+      reference_temperature: 0.6
+      aggregator_temperature: 0.4
+      max_tokens: 4096
 
 gateway:
   allowed_user_ids:

@@ -122,22 +122,43 @@ deploy_hermes() {
       # Preserve existing api_key (per-machine) before overwriting
       local existing_key=""
       if [ -f "$dst_config" ]; then
-        existing_key=$(grep '^  api_key:' "$dst_config" | head -1 | sed 's/^  api_key: //' || true)
+        existing_key=$(python3 -c "
+import yaml, sys
+with open('$dst_config') as f:
+    cfg = yaml.safe_load(f) or {}
+key = cfg.get('model', {}).get('api_key', '')
+sys.stdout.write(key if key and key != 'PLACEHOLDER_REPLACE_LOCALLY' else '')
+" 2>/dev/null || true)
       fi
 
       mkdir -p "$(dirname "$dst_config")"
       cp "$src_config" "$dst_config"
 
-      # Restore api_key placeholder if we had a real key
+      # Restore api_key placeholder if we had a real key (Python YAML round-trip — safe)
       if [ -n "$existing_key" ]; then
-        sed -i "s|PLACEHOLDER_REPLACE_LOCALLY|${existing_key}|" "$dst_config"
+        python3 -c "
+import yaml
+with open('$dst_config') as f:
+    cfg = yaml.safe_load(f)
+cfg['model']['api_key'] = '$existing_key'
+with open('$dst_config', 'w') as f:
+    yaml.safe_dump(cfg, f, default_flow_style=False, allow_unicode=True)
+" 2>/dev/null
         echo "  🔑 ${profile_name}/config.yaml: api_key preserved"
       else
         echo "  📄 ${profile_name}/config.yaml: created from repo template"
       fi
 
       if [ -n "$webhook_secret" ] && grep -q "PLACEHOLDER_WEBHOOK_SECRET_SOPS" "$dst_config" 2>/dev/null; then
-        sed -i "s|PLACEHOLDER_WEBHOOK_SECRET_SOPS|${webhook_secret}|" "$dst_config"
+        python3 -c "
+import sys
+secret = sys.argv[1]
+with open('$dst_config') as f:
+    content = f.read()
+content = content.replace('PLACEHOLDER_WEBHOOK_SECRET_SOPS', secret)
+with open('$dst_config', 'w') as f:
+    f.write(content)
+" "$webhook_secret" 2>/dev/null
         echo "  🔐 WEBHOOK_SECRET injected in ${profile_name}/config.yaml"
       fi
     done
@@ -152,6 +173,8 @@ deploy_hermes() {
   fi
 
   echo "🔧 Installing Hermes gateway service (veille)..."
+  # yes | : hermes gateway install prompts only for systemd confirmation.
+  # It has no destructive prompts. The --force flag handles reinstall.
   yes | hermes --profile veille gateway install 2>&1 | tail -3
   echo "✅ Hermes deployed"
 

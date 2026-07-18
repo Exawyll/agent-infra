@@ -1,16 +1,16 @@
 # Hermes Profile — Assistant (Usage quotidien, remplace l'ancien main)
 # Clé : agent-assistant → modèles rapide + raisonnement
-# Base URL : http://127.0.0.1:4000/v1 (LiteLLM)
+# Provider: custom → LiteLLM (api_key stockée dans le .env du profil)
+# Ne PAS mettre la clé en clair ici — la copie locale à ~/.hermes/profiles/ contient la vraie clé
 
 model:
   default: rapide
-  provider: litellm-assistant
+  provider: custom
   base_url: http://127.0.0.1:4000/v1
+  api_key: PLACEHOLDER_REPLACE_LOCALLY
+  api_mode: chat_completions
 
-providers:
-  litellm-assistant:
-    api_key_env: LITELLM_KEY_AGENT_ASSISTANT
-    base_url: http://127.0.0.1:4000/v1
+providers: {}
 
 fallback_providers: []
 credential_pool_strategies: {}

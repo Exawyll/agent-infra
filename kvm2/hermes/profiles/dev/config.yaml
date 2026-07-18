@@ -1,16 +1,16 @@
 # Hermes Profile — Dev (Code Review & Development)
-# Mode : rapide (défaut) + review (code review)
-# Base URL : http://127.0.0.1:4000/v1 (LiteLLM)
+# Mode : code (défaut) + review (code review)
+# Provider: custom → LiteLLM (api_key stockée dans le .env du profil)
+# Ne PAS mettre la clé en clair ici — la copie locale à ~/.hermes/profiles/ contient la vraie clé
 
 model:
-  default: rapide
-  provider: litellm-dev
+  default: code
+  provider: custom
   base_url: http://127.0.0.1:4000/v1
+  api_key: PLACEHOLDER_REPLACE_LOCALLY
+  api_mode: chat_completions
 
-providers:
-  litellm-dev:
-    api_key_env: LITELLM_KEY_AGENT_DEV
-    base_url: http://127.0.0.1:4000/v1
+providers: {}
 
 fallback_providers: []
 credential_pool_strategies: {}
@@ -74,6 +74,9 @@ telegram:
     rich_messages: true
     rich_drafts: false
 
+gateway:
+  allowed_user_ids:
+    - "8262789577"
 
 moa:
   default_preset: code-review
@@ -82,15 +85,11 @@ moa:
     code-review:
       enabled: true
       reference_models:
-        - provider: litellm-dev
+        - provider: custom
           model: review
       aggregator:
-        provider: litellm-dev
+        provider: custom
         model: review
       reference_temperature: 0.6
       aggregator_temperature: 0.4
       max_tokens: 4096
-
-gateway:
-  allowed_user_ids:
-    - "8262789577"

@@ -3,49 +3,34 @@
 # Usage: ./install.sh [hermes|systemd|all]
 set -euo pipefail
 
-HERMES_VERSION="${HERMES_VERSION:-0.17.0}"
 HERMES_HOME="${HERMES_HOME:-/root/.hermes}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 install_hermes_binary() {
-  echo "📦 Installing Hermes Agent v${HERMES_VERSION}..."
+  echo "📦 Installing Hermes Agent..."
 
   if command -v hermes &>/dev/null; then
     local current
     current=$(hermes --version 2>/dev/null | head -1 || echo "unknown")
     echo "  Hermes already installed: ${current}"
-    echo "  To upgrade, uninstall first: pip uninstall -y hermes-agent"
+    echo "  To upgrade: hermes update"
     return
   fi
 
-  # Hermes is installed via pip
-  pip install hermes-agent=="${HERMES_VERSION}" --quiet 2>&1 || {
-    echo "  ⚠️  pip install failed — trying direct binary download..."
-    local url="https://github.com/NousResearch/hermes-agent/releases/download/v${HERMES_VERSION}/hermes-agent-${HERMES_VERSION}-linux-x86_64.tar.gz"
-    curl -sSfL "$url" | tar xz -C /usr/local/bin/ hermes
-    chmod +x /usr/local/bin/hermes
-  }
+  # Official installer (uv + venv at /usr/local/lib/hermes-agent, matches
+  # what's actually running on KVM2). "pip install hermes-agent==X" is NOT
+  # a valid install path — pip isn't even present by default on a fresh
+  # Ubuntu 24.04 box, and there's no matching GitHub release tarball either;
+  # both were confirmed broken on a from-scratch KVM1 test.
+  #
+  # No version pin available: the installer always tracks the `main`
+  # branch (only `--branch NAME` is exposed, default main), so a fresh
+  # install gets whatever is newest upstream, which may differ from
+  # whatever version is currently running on KVM2. Re-verify functionally
+  # after any restore.sh run rather than assuming version parity.
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 
   echo "✅ Hermes installed: $(hermes --version | head -1)"
-}
-
-install_systemd() {
-  echo "🔧 Installing Hermes systemd service..."
-  local unit_src="${SCRIPT_DIR}/hermes.service"
-  local unit_dst="/etc/systemd/system/hermes.service"
-
-  if [ ! -f "$unit_src" ]; then
-    echo "❌ Unit file not found: $unit_src"
-    exit 1
-  fi
-
-  cp "$unit_src" "$unit_dst"
-  chmod 644 "$unit_dst"
-  systemctl daemon-reload
-  systemctl enable hermes.service
-  systemctl start hermes.service
-  echo "✅ Hermes systemd service installed and started"
-  systemctl status hermes.service --no-pager | head -5
 }
 
 install_gitleaks() {
@@ -87,24 +72,30 @@ install_sops_age() {
 
 case "${1:-all}" in
   hermes)    install_hermes_binary ;;
-  systemd)   install_systemd ;;
+  systemd)
+    echo "⚠️  'systemd' n'installe plus rien : le service global hermes.service"
+    echo "   (ancienne syntaxe CLI, obsolète) a été retiré. Chaque profil est"
+    echo "   servi par son propre service systemd user-level, installé par"
+    echo "   ./scripts/deploy.sh hermes (hermes --profile <nom> gateway install)."
+    ;;
   gitleaks)  install_gitleaks ;;
   sops)      install_sops_age ;;
-  deps)      install_gitleaks; install_sops_age ;;
+  deps)      install_gitleaks; install_sops_age; install_hermes_binary ;;
   all)
     install_gitleaks
     install_sops_age
     install_hermes_binary
-    install_systemd
     echo ""
     echo "🎉 Installation terminée. Vérifie :"
-    echo "   systemctl status hermes"
     echo "   hermes --version"
     echo "   gitleaks version"
     echo "   age --version"
+    echo ""
+    echo "   Les services gateway par profil sont installés par :"
+    echo "   ./scripts/deploy.sh hermes"
     ;;
   *)
-    echo "Usage: $0 [hermes|systemd|gitleaks|sops|deps|all]"
+    echo "Usage: $0 [hermes|gitleaks|sops|deps|all]"
     exit 1
     ;;
 esac

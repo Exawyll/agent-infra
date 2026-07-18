@@ -94,3 +94,19 @@ moa:
 gateway:
   allowed_user_ids:
     - "8262789577"
+
+moa:
+  default_preset: code-review
+  active_preset: code-review
+  presets:
+    code-review:
+      enabled: true
+      reference_models:
+        - provider: custom
+          model: review
+      aggregator:
+        provider: custom
+        model: review
+      reference_temperature: 0.6
+      aggregator_temperature: 0.4
+      max_tokens: 4096

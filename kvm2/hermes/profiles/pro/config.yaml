@@ -1,5 +1,6 @@
 # Hermes Profile — Pro (Wylliam Professionnel)
 # Provider: custom → LiteLLM (api_key stockée dans le .env du profil)
+# Mode : rapide (défaut) + raisonnement (MOA review)
 # Ne PAS mettre la clé en clair ici — la copie locale à ~/.hermes/profiles/ contient la vraie clé
 
 model:
@@ -98,11 +99,11 @@ moa:
     code-review:
       enabled: true
       reference_models:
-        - provider: litellm-pro
+        - provider: custom
           model: raisonnement
       aggregator:
-        provider: litellm-pro
-        model: review
+        provider: custom
+        model: raisonnement
       reference_temperature: 0.6
       aggregator_temperature: 0.4
       reference_max_tokens: 800

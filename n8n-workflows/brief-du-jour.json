@@ -1,0 +1,471 @@
+{
+  "updatedAt": "2026-04-19T14:00:49.034Z",
+  "createdAt": "2026-04-09T12:50:25.287Z",
+  "id": "ZU3UJqoY296wYeRi",
+  "name": "brief-du-jour",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "brief-du-jour-refresh",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "67fab26e-5bfd-487c-ab51-0799cb1b2f6e",
+      "name": "Webhook refresh manuel",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        240
+      ],
+      "webhookId": "brief-du-jour-refresh"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calcul des dates en ISO (fuseau Europe/Paris)\nconst now = new Date();\nconst tzOffset = 2 * 60 * 60 * 1000; // ajuster si hiver (1h)\nconst paris = new Date(now.getTime() + tzOffset);\n\nconst yyyy = paris.getUTCFullYear();\nconst mm = String(paris.getUTCMonth() + 1).padStart(2, '0');\nconst dd = String(paris.getUTCDate()).padStart(2, '0');\n\nconst today = `${yyyy}-${mm}-${dd}`;\nconst startOfDay = `${today}T00:00:00.000+02:00`;\nconst endOfDay = `${today}T23:59:59.999+02:00`;\n\nreturn [{\n  json: {\n    today,\n    startOfDay,\n    endOfDay\n  }\n}];"
+      },
+      "id": "13a8d960-1b04-4200-ab89-f8e2fbfd511f",
+      "name": "Compute dates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.notion.com/v1/databases/6b279b501f544b57b96d919c5f667730/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  filter: {\n    property: 'Traité',\n    checkbox: { equals: false }\n  },\n  page_size: 20\n}) }}",
+        "options": {}
+      },
+      "id": "73f11d80-159b-41ae-9f77-f82090237e17",
+      "name": "Query Inbox GTD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        96,
+        144
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit le payload Notion pour remplacer le contenu de la page Brief\nconst data = $json;\n\nconst blocks = [];\n\n// Header\nblocks.push({\n  object: 'block',\n  type: 'heading_1',\n  heading_1: {\n    rich_text: [{ type: 'text', text: { content: `Brief du ${data.date}` } }]\n  }\n});\n\nblocks.push({\n  object: 'block',\n  type: 'paragraph',\n  paragraph: {\n    rich_text: [{\n      type: 'text',\n      text: { content: `Généré à ${new Date(data.generated_at).toLocaleTimeString('fr-FR')} — ${data.stats.nb_inbox} inbox à traiter — ${data.stats.nb_faire} ➡️ Faire, ${data.stats.nb_a_verifier} 🟡 À vérifier` },\n      annotations: { italic: true, color: 'gray' }\n    }]\n  }\n});\n\n// Payload JSON brut en code block (Claude lira ça)\nblocks.push({\n  object: 'block',\n  type: 'heading_2',\n  heading_2: { rich_text: [{ type: 'text', text: { content: 'Data JSON (pour Claude)' } }] }\n});\n\nconst jsonStr = JSON.stringify(data, null, 2);\n// Notion limite code block à 2000 chars par rich_text, on split si besoin\nconst chunks = [];\nfor (let i = 0; i < jsonStr.length; i += 1900) {\n  chunks.push(jsonStr.slice(i, i + 1900));\n}\n\nblocks.push({\n  object: 'block',\n  type: 'code',\n  code: {\n    language: 'json',\n    rich_text: chunks.map(c => ({ type: 'text', text: { content: c } }))\n  }\n});\n\nreturn [{ json: { blocks, page_data: data } }];"
+      },
+      "id": "3f688b55-32e4-4c4d-800f-08b08c0b21f1",
+      "name": "Build Notion blocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.notion.com/v1/blocks/33d15cc8-89a0-8153-badd-c580a18203fe/children",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ac8dede1-308b-4a44-9f96-9195468b79c1",
+      "name": "Get existing blocks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        752,
+        144
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "results",
+        "options": {}
+      },
+      "id": "770329fa-6962-4766-bbcf-1dc3f68ba123",
+      "name": "Split existing blocks",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://api.notion.com/v1/blocks/{{ $json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2025-09-03"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f03c8226-03c8-4478-9d84-a624084458aa",
+      "name": "Delete old blocks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1424,
+        80
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/blocks/33d15cc8-89a0-8153-badd-c580a18203fe/children",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ children: $('Build Notion blocks').item.json.blocks }) }}",
+        "options": {}
+      },
+      "id": "b4c52b58-6ae7-464a-a5a0-09c055348f97",
+      "name": "Append new blocks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1872,
+        144
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "064461bd-1d6c-4933-8161-2cc8e72e4830",
+              "leftValue": "={{ $json.results.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        976,
+        144
+      ],
+      "id": "09d1e050-5370-42d1-b151-a9b2396d1d12",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nreturn [{ json: { deleted: $input.all().length } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        80
+      ],
+      "id": "45fb043a-3879-4718-bbf6-7b4091d39b80",
+      "name": "Wait all deletes"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inboxRaw = $input.first().json?.results || [];\n\nconst getTitle = (page, propName) => {\n  const p = page.properties?.[propName];\n  if (!p) return '';\n  if (p.title) return p.title.map(t => t.plain_text).join('');\n  return '';\n};\n\nconst getSelect = (page, propName) =>\n  page.properties?.[propName]?.select?.name || '';\n\nconst getRichText = (page, propName) => {\n  const p = page.properties?.[propName]?.rich_text;\n  if (!p) return '';\n  return p.map(t => t.plain_text).join('').slice(0, 300);\n};\n\nconst inbox = inboxRaw.map(p => ({\n  id: p.id,\n  titre: getTitle(p, 'Capture'),\n  action: getSelect(p, 'Action'),\n  confiance: getSelect(p, 'Confiance'),\n  source: getSelect(p, 'Source'),\n  notes: getRichText(p, 'Notes'),\n  lien_source: p.properties?.['Lien Source']?.url || ''\n}));\n\nreturn [{\n  json: {\n    date: $('Compute dates').item.json.today,\n    generated_at: new Date().toISOString(),\n    stats: {\n      nb_inbox: inbox.length,\n      nb_a_verifier: inbox.filter(i => i.confiance === '🟡 À vérifier').length,\n      nb_faire: inbox.filter(i => i.action === '➡️ Faire').length\n    },\n    inbox\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        144
+      ],
+      "id": "a0f2c5f6-0524-40ba-970d-68eb740f0fd9",
+      "name": "Aggregate & filter"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "=0 7-19/2 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "821bbd35-8591-4593-99a4-f82b4ce0b90e",
+      "name": "7h, 9h, 11h, 13h, 15h, 17h, 19h — tous les jours de semaine",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -352,
+        48
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook refresh manuel": {
+      "main": [
+        [
+          {
+            "node": "Compute dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute dates": {
+      "main": [
+        [
+          {
+            "node": "Query Inbox GTD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Inbox GTD": {
+      "main": [
+        [
+          {
+            "node": "Aggregate & filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Notion blocks": {
+      "main": [
+        [
+          {
+            "node": "Get existing blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get existing blocks": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split existing blocks": {
+      "main": [
+        [
+          {
+            "node": "Delete old blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete old blocks": {
+      "main": [
+        [
+          {
+            "node": "Wait all deletes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Split existing blocks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append new blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait all deletes": {
+      "main": [
+        [
+          {
+            "node": "Append new blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate & filter": {
+      "main": [
+        [
+          {
+            "node": "Build Notion blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7h, 9h, 11h, 13h, 15h, 17h, 19h — tous les jours de semaine": {
+      "main": [
+        [
+          {
+            "node": "Compute dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": {
+    "node:Schedule 7h45 (L-V)": {
+      "recurrenceRules": []
+    },
+    "node:7h, 9h, 11h, 13h, 15h, 17h, 19h — tous les jours de semaine": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "5cbdc646-ba84-4ec5-9a7e-aedf0ec9780d",
+  "activeVersionId": null,
+  "versionCounter": 137,
+  "triggerCount": 2,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-04-09T12:50:25.291Z",
+      "createdAt": "2026-04-09T12:50:25.291Z",
+      "role": "workflow:owner",
+      "workflowId": "ZU3UJqoY296wYeRi",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 5cbdc646",
+    "description": ""
+  }
+}

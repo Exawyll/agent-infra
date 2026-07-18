@@ -1,0 +1,491 @@
+{
+  "updatedAt": "2026-01-11T16:17:38.779Z",
+  "createdAt": "2026-01-10T14:53:42.226Z",
+  "id": "QWE4hKxrXm1CMyNs6W1Fz",
+  "name": "Backlog Qualifier",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        48
+      ],
+      "id": "436356b5-2314-46e1-b8ba-e127a4697ec2",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "={{ $env.NOTION_BACKLOG_DB }}",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "filterType": "json",
+        "filterJson": "={\n  \"property\": \"Status\",\n  \"select\": {\n    \"equals\": \"todo\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        48
+      ],
+      "id": "33442a79-917f-4644-b255-4836fbf1191d",
+      "name": "Get many database pages",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        448,
+        48
+      ],
+      "id": "ff9cedfa-469f-4bad-8ae2-0c782262e91a",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"decision\": {\n      \"type\": \"string\",\n      \"enum\": [\"READY\", \"NEEDS_CLARIFICATION\", \"READY_TO_DEV\"],\n      \"description\": \"La décision finale: READY, NEEDS_CLARIFICATION ou READY_TO_DEV\"\n    },\n    \"reasoning\": {\n      \"type\": \"string\",\n      \"description\": \"Une explication courte de la décision\"\n    },\n    \"technical_approach\": {\n      \"type\": \"string\",\n      \"description\": \"L'approche technique (obligatoire si READY ou READY_TO_DEV, sinon null)\"\n    },\n    \"question\": {\n      \"type\": \"string\",\n      \"description\": \"La question pour le PO (obligatoire si NEEDS_CLARIFICATION, sinon null)\"\n    },\n    \"implementation_plan\": {\n      \"type\": \"string\",\n      \"description\": \"Les étapes détaillées (obligatoire si READY_TO_DEV, sinon null)\"\n    }\n  },\n  \"required\": [\n    \"decision\",\n    \"reasoning\",\n    \"technical_approach\",\n    \"question\",\n    \"implementation_plan\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        816,
+        224
+      ],
+      "id": "1ee3e6e1-528f-4fe5-a69d-c4f48c1c9317",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        688,
+        224
+      ],
+      "id": "64892d88-671c-430b-bb05-57d4307359d1",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "7h7iCjgmfwc33UgQ",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Loop Over Items').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1408,
+        -16
+      ],
+      "id": "7d689940-1830-4860-90b6-52a491805f05",
+      "name": "Update a database page",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Loop Over Items').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "blocked"
+            },
+            {
+              "key": "Technical Notes|rich_text",
+              "textContent": "=❓ {{ $json.output.properties.reasoning.type }} - Question: {{ $json.output.properties.question.type }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1328,
+        128
+      ],
+      "id": "fa2d4eac-bbe3-4a06-a491-944fe5cd9e82",
+      "name": "Update a database page1",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "8262789577",
+        "text": "=❓ [{{ $('Loop Over Items').item.json.property_id }}] {{ $('Loop Over Items').item.json.name }}\n\n{{ $('Backlog Qualifier').item.json.output.properties.question.type }}\n\nRépondre avec: {{ $('Loop Over Items').item.json.property_id }}: votre réponse\n",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1520,
+        160
+      ],
+      "id": "c7a7b54c-6a77-44d1-b067-6a508ddae58c",
+      "name": "Send a text message",
+      "webhookId": "290b29dd-aa15-4031-8816-90cd234296f5",
+      "credentials": {
+        "telegramApi": {
+          "id": "bT73o9WOxsgD52BV",
+          "name": "Telegram app_decision_details"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Tu es un agent de qualification de backlog pour RecipeApp.\n\n## CONTEXTE APP\nApplication de gestion de recettes de cuisine :\n- Créer/gérer des ingrédients (nom, unité optionnelle)\n- Créer des recettes avec liste d'ingrédients\n- Rechercher des recettes\n\n## CONTEXTE TECHNIQUE\nStack : Python FastAPI, Supabase (PostgreSQL), GCP Cloud Run\nRepo structure : backend/src/ avec models/, schemas/, api/\nTu as TOUTE LATITUDE sur les choix techniques.\n\n## RÈGLES DE DÉCISION\n\nTU DÉCIDES SEUL (ne jamais demander au PO) :\n- Architecture, patterns, nommage\n- Structure des modèles/tables\n- Choix de librairies\n- Migrations, config DB\n- Gestion d'erreurs technique\n\nTU DEMANDES AU PO uniquement si :\n- Ambiguïté sur le BESOIN UTILISATEUR\n- Règle métier non définie\n- Comportement fonctionnel à clarifier\n\n## STORY À ANALYSER\nID: {{ $json.property_id || 'NO-ID' }}\nTitre: {{ $json.name }}\nCritères: {{ $json.property_acceptance_criteria || 'Aucun' }}\nFeedback PO: {{ $json.property_feedback || 'Aucun' }}\n\n## TA RÉPONSE (JSON uniquement)\n{\n  \"decision\": \"READY\" ou \"NEEDS_CLARIFICATION\" ou \"READY_TO_DEV\",\n  \"reasoning\": \"explication courte\",\n  \"technical_approach\": \"si READY ou READY_TO_DEV: comment implémenter\",\n  \"question\": \"si NEEDS_CLARIFICATION: question pour le PO, sinon null\",\n  \"implementation_plan\": \"si READY_TO_DEV: étapes détaillées de l'implémentation\"\n}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        672,
+        0
+      ],
+      "id": "93096d92-e8f8-4f53-a2da-5d5b95915204",
+      "name": "Backlog Qualifier"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.properties.decision.type }}",
+                    "rightValue": "READY",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "a1dea788-9fb4-44ce-946d-1b4e1d8c00ee"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "READY"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "71eb3b8d-8893-4eea-ad55-ff0c0bfbafb5",
+                    "leftValue": "={{ $json.output.properties.decision.type }}",
+                    "rightValue": "NEEDS_CLARIFICATION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "NEEDS_CLARIFICATION"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8ef2dbef-fd63-40cd-b2f9-c3922c0a81d0",
+                    "leftValue": "={{ $json.output.properties.decision.type }}",
+                    "rightValue": "READY_TO_DEV",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "READY_TO_DEV"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "170b407d-99d0-490e-a1f5-ca177b338538",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Loop Over Items').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "=Status"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1424,
+        304
+      ],
+      "id": "a8c76112-bbfd-40c8-805d-bcbf517be0c6",
+      "name": "Update a database page2",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get many database pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many database pages": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Backlog Qualifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Backlog Qualifier",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Backlog Qualifier",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a database page": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a database page1": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backlog Qualifier": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Update a database page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update a database page1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update a database page2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "9c583066-5c2c-492a-93c2-9f88cad8d317",
+  "activeVersionId": null,
+  "versionCounter": 25,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-01-10T14:53:42.234Z",
+      "createdAt": "2026-01-10T14:53:42.234Z",
+      "role": "workflow:owner",
+      "workflowId": "QWE4hKxrXm1CMyNs6W1Fz",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

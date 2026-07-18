@@ -1,0 +1,620 @@
+{
+  "updatedAt": "2026-07-16T04:36:40.998Z",
+  "createdAt": "2025-10-26T10:03:45.759Z",
+  "id": "XkYSE2ziraO4JEN8",
+  "name": "Hostinger Snapshot",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "879170c4-b24c-4a32-95b5-7a1e4742e371",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -32,
+        1008
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "response",
+        "options": {}
+      },
+      "id": "2ad941fa-207b-432a-85be-791ae0d33f88",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        576,
+        864
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Hostinger Snapshot with VPS Metrics\nAutomate the creation of snapshots of all your Hostinger VPS, receive success or failure alerts via WhatsApp, use in n8n self-hosting.\n\n### Prerequisites (Community Nodes):\nn8n-nodes-hostinger-api\nn8n-nodes-evolution-api (you can use another notification method, but copy first content message model)\n\n### Setup:\n1 - Install Community Nodes\n2 - Create Hostinger API Key: https://hpanel.hostinger.com/profile/api\n3 - Create credential in first node and set in next nodes;\n4 - Configure notifications Evolution API (WhatsApp) or other means;\n\nNote: Hostinger allows one snapshot per VPS and the previous one will always be replaced.\n\nWorkflow by [Leandro Melo]\nbuy me a coffe!☕😀\nPaypal/Pix: contato@sistemanaweb.com\n",
+        "height": 496,
+        "width": 609,
+        "color": 4
+      },
+      "id": "fe76dbff-fa13-4e60-b70b-09120cb32d0d",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        32,
+        -528
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "b68f3146-9405-4e68-9654-ea608a563e6a",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        1344,
+        864
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "47a3ea30-2ae3-46c3-a788-185d757e33fc",
+      "name": "Wait 2 seg",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        2416,
+        864
+      ],
+      "webhookId": "51576f9f-ca59-499e-a510-23a568d7964d",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 4
+            }
+          ]
+        }
+      },
+      "id": "0d0fc990-0e1d-402a-9e5b-898d4020f1a7",
+      "name": "Every day 4:00am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -32,
+        768
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "vpsAction": "listVms"
+      },
+      "id": "6238a7c7-7209-4353-80a6-0b1d0bfcb753",
+      "name": "Hostinger API list VPS",
+      "type": "n8n-nodes-hostinger-api.hostingerApi",
+      "position": [
+        368,
+        864
+      ],
+      "typeVersion": 1,
+      "credentials": {
+        "hostingerApi": {
+          "id": "lRD6kqZb8BXF92qn",
+          "name": "Hostinger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "10bde94d-4ca9-479a-98d6-b39695fe7b78",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.state }}",
+              "rightValue": "running"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fab0493b-e591-48f6-9e7c-528dc58f36a1",
+      "name": "Avaliables VPS",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        736,
+        864
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "virtualMachineId": "={{ $('Avaliables VPS').item.json.id }}"
+      },
+      "id": "04be5e79-0c00-456b-b71b-8b9d7c0bae8b",
+      "name": "Get VPS Metrics",
+      "type": "n8n-nodes-hostinger-api.hostingerApi",
+      "position": [
+        944,
+        864
+      ],
+      "typeVersion": 1,
+      "credentials": {
+        "hostingerApi": {
+          "id": "lRD6kqZb8BXF92qn",
+          "name": "Hostinger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "subcategory": "snapshots",
+        "vpsAction": "createSnapshot",
+        "virtualMachineId": "={{ $('Avaliables VPS').item.json.id }}"
+      },
+      "id": "01e607fb-8ca1-45c8-8b5c-edf3b6012edc",
+      "name": "Create Snapshot",
+      "type": "n8n-nodes-hostinger-api.hostingerApi",
+      "position": [
+        1952,
+        880
+      ],
+      "typeVersion": 1,
+      "credentials": {
+        "hostingerApi": {
+          "id": "lRD6kqZb8BXF92qn",
+          "name": "Hostinger account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "id": "135f4324-104d-4bef-a1b3-d098044f416c",
+      "name": "Next VPS",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        2224,
+        864
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "### VPS Metrics avaliables (send in messages):\n\n\n🔹Status: snapshot status\n🔹Date: snapshot date time\n🔹Server: server name\n🔹IP: external server IP\n\n⚙️ Métrics: \n🔹 Number of vCPUs \n🔹 Ram usage / avaliable \n🔹 Hard Disk usage / avaliable\n🔹 Operational Sys and version\n🔹 Uptime time (days, hours)",
+        "height": 80,
+        "width": 150
+      },
+      "id": "6fed18cf-12c0-49e0-9375-ba2f8e35b113",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        654,
+        176
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "### Set Hostinger API credential",
+        "height": 680,
+        "width": 220,
+        "color": 6
+      },
+      "id": "1990c019-71d6-479f-a9b5-d3b6d3130a5b",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        304,
+        608
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "### Set Hostinger API credential",
+        "height": 680,
+        "width": 220,
+        "color": 6
+      },
+      "id": "5c5ead1c-1d6a-46f8-8f53-c2bed4ca5ece",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        864,
+        608
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "### Set Hostinger API credential",
+        "height": 680,
+        "width": 220,
+        "color": 6
+      },
+      "id": "fe03886b-671e-47a4-998d-b811b267f0aa",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1888,
+        608
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "### Set destination alert message (use message model inside)",
+        "height": 680,
+        "width": 320,
+        "color": 4
+      },
+      "id": "1dd0ae42-6265-4423-a201-fa6c59adf925",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1504,
+        608
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "08aea2dd-4226-46d5-ae08-3f1d764bd658",
+              "name": "id",
+              "type": "number",
+              "value": "={{ $('Avaliables VPS').item.json.id }}"
+            },
+            {
+              "id": "3115465b-24ed-4f9e-a9af-53e34d2db384",
+              "name": "plan",
+              "type": "string",
+              "value": "={{ $('Avaliables VPS').item.json.plan }}"
+            },
+            {
+              "id": "1611cd7b-cc97-4c12-822c-6e8da601c508",
+              "name": "hostname",
+              "type": "string",
+              "value": "={{ $('Avaliables VPS').item.json.hostname }}"
+            },
+            {
+              "id": "c1e1edd4-7c45-4f96-a7e0-2c67c6aa8968",
+              "name": "cpus",
+              "type": "number",
+              "value": "={{ $('Avaliables VPS').item.json.cpus }}"
+            },
+            {
+              "id": "78e6cf5e-979f-4e31-908c-f4c6b95cb316",
+              "name": "disk",
+              "type": "number",
+              "value": "={{ $('Avaliables VPS').item.json.disk }}"
+            },
+            {
+              "id": "58e18048-6200-40fc-8957-5022810c7474",
+              "name": "IP",
+              "type": "string",
+              "value": "={{ $('Avaliables VPS').item.json.ipv4[0].address }}"
+            },
+            {
+              "id": "e8f2e562-9a96-479f-b3ca-a0770296d343",
+              "name": "OS",
+              "type": "string",
+              "value": "={{ $('Avaliables VPS').item.json.template.name }}"
+            },
+            {
+              "id": "c18f9dc3-7190-4f38-b4b8-2068a1c89023",
+              "name": "cpu_usage",
+              "type": "string",
+              "value": "={{ $('Get VPS Metrics').item.json.response.cpu_usage.usage.values().last() }}%"
+            },
+            {
+              "id": "47607d2b-5980-4e27-9232-06e166c70193",
+              "name": "ram_usage",
+              "type": "string",
+              "value": "={{\n  \"RAM: \" + \n  ($('Get VPS Metrics').item.json.response.ram_usage.usage.values().last() / 1073741824).toFixed(2) + \n  \" GB (\" + \n  (($('Get VPS Metrics').item.json.response.ram_usage.usage.values().last() / ($('Avaliables VPS').item.json.memory * 1048576)) * 100).toFixed(2) + \n  \"%) | Free: \" + \n  (($('Avaliables VPS').item.json.memory - ($('Get VPS Metrics').item.json.response.ram_usage.usage.values().last() / 1048576)) / 1024).toFixed(2) + \n  \" GB\"\n}}"
+            },
+            {
+              "id": "b2fd1374-1199-4020-a2b4-00b9d9496c77",
+              "name": "uptime",
+              "type": "string",
+              "value": "={{ \n  \"Days: \" + Math.floor($('Get VPS Metrics').item.json.response.uptime.usage.values().last() / 86400) + \n  \" | Hours: \" + Math.floor(($('Get VPS Metrics').item.json.response.uptime.usage.values().last() % 86400) / 3600)\n}}"
+            },
+            {
+              "id": "a6b3ecbf-e734-48cd-b1d0-9094cf52c7ec",
+              "name": "disco",
+              "type": "string",
+              "value": "={{ \"Used: \" + ($('Get VPS Metrics').item.json.response.disk_space.usage.values().last() / 1073741824).toFixed(2) + \" GB (\" + (($('Get VPS Metrics').item.json.response.disk_space.usage.values().last() / 1073741824) / ($('Avaliables VPS').item.json.disk / 1024) * 100).toFixed(2) + \"%) | Free: \" + ($('Avaliables VPS').item.json.disk / 1024 - $('Get VPS Metrics').item.json.response.disk_space.usage.values().last() / 1073741824).toFixed(2) + \" GB\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7f3edc4a-9e2e-4606-8d9f-36246d28edfc",
+      "name": "Calculate metrics",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1152,
+        864
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 720,
+        "width": 2840,
+        "color": 3
+      },
+      "id": "5ba17778-d4f3-412d-b951-5896a6cd5510",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -176,
+        576
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "chatId": "8262789577",
+        "text": "=Snapshot {{ $('Create Snapshot').item.json.response.name }} Hostinger créé avec succès {{ $('Create Snapshot').item.json.response.created_at }}. ID : {{ $('Create Snapshot').item.json.response.id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1632,
+        736
+      ],
+      "id": "643bf869-39bd-4a78-9e1b-0d4049ae32ef",
+      "name": "Succes Message",
+      "webhookId": "9ad44019-ab52-4a73-a48d-5d5b9a247fb4",
+      "credentials": {
+        "telegramApi": {
+          "id": "ihZuIM3ZQcKsWsu9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "8262789577",
+        "text": "=Snapshot Hostinger n'a pas pu être créé",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1632,
+        1120
+      ],
+      "id": "ed3fd633-957e-407b-a294-cfd094c82aab",
+      "name": "Error Message",
+      "webhookId": "9ad44019-ab52-4a73-a48d-5d5b9a247fb4",
+      "credentials": {
+        "telegramApi": {
+          "id": "ihZuIM3ZQcKsWsu9",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Next VPS": {
+      "main": [
+        [
+          {
+            "node": "Wait 2 seg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Avaliables VPS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2 seg": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate metrics": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Hostinger API list VPS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hostinger API list VPS": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every day 4:00am": {
+      "main": [
+        [
+          {
+            "node": "Hostinger API list VPS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Succes Message": {
+      "main": [
+        []
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Succes Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Next VPS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get VPS Metrics": {
+      "main": [
+        [
+          {
+            "node": "Calculate metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avaliables VPS": {
+      "main": [
+        [
+          {
+            "node": "Get VPS Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "node:Every day 4:00am": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "e0523bb8-23d5-49cb-a14c-8fb37d098418",
+  "activeVersionId": "8559b4a6-bdb7-4383-bf0a-c16767ee5b0e",
+  "versionCounter": 12,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2025-10-26T10:03:45.765Z",
+      "createdAt": "2025-10-26T10:03:45.765Z",
+      "role": "workflow:owner",
+      "workflowId": "XkYSE2ziraO4JEN8",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

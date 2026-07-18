@@ -1,0 +1,520 @@
+{
+  "updatedAt": "2026-06-30T19:52:28.870Z",
+  "createdAt": "2026-06-27T10:52:03.360Z",
+  "id": "9q1JSTfeQDkd8pVO",
+  "name": "Capture les teams",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "c09db3e1-7430-403f-b019-9e81669c9b8e",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "webhookId": "c09db3e1-7430-403f-b019-9e81669c9b8e",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ygQIRaTq8To8Q1sk",
+          "name": "Header Auth account"
+        }
+      },
+      "id": "d1ca7a5e-b33e-4c24-b732-5ddc172de9f8"
+    },
+    {
+      "name": "Parse Teams",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Parse Teams — exploite le contenu intrinsèque du message\nconst payload = $input.first().json;\nlet m = {};\n\n// Essaye plusieurs sources pour le message\nif (typeof payload.body?.message === 'string') {\n  m = JSON.parse(payload.body.message);\n} else if (typeof payload.message === 'string') {\n  m = JSON.parse(payload.message);\n} else if (payload.from?.user) {\n  m = payload; // déjà parsé (message Graph API brut)\n}\n\n// Détection des @mentions et type de conversation\nconst wylliamId = '9f956725-164d-4c39-a211-74fea544bf4e';\nconst chatId = m.chatId || payload.body?.conversationId || payload.chatId || '';\nconst mentions = Array.isArray(m.mentions) ? m.mentions : [];\nconst isMentioned = mentions.some(men =>\n  men.mentioned?.user?.id === wylliamId ||\n  (men.mentionText && men.mentionText.toLowerCase().includes('wylliam'))\n);\n// 1:1 chat = contient \"_UUID@\", groupe = @thread.v2\nconst isDirectMessage = /_[a-f0-9-]{20,}@/.test(chatId);\n\n// Utilise les champs intrinsèques du payload Power Automate comme fallback\nconst result = {\n  senderName: m.from?.user?.displayName || m.from?.displayName || payload.senderName || 'Inconnu',\n  senderId: m.from?.user?.id || m.from?.id || payload.senderId || '',\n  messageText: (m.body?.plainTextContent || payload.body?.messageText || m.text || '').replace(/<[^>]*>/g, ''),\n  messageLink: payload.body?.lien || payload.lien || m.messageLink || '',\n  chatId: chatId,\n  isFromWylliam: (m.from?.user?.id || payload.senderId) === wylliamId,\n  isMentioned: isMentioned,\n  isDirectMessage: isDirectMessage\n};\n\n// Debug log via console\nconsole.log('[ParseTeams]', JSON.stringify({\n  sender: result.senderName,\n  mentioned: isMentioned,\n  direct: isDirectMessage,\n  chatId: chatId.substring(0, 30)\n}));\n\nreturn result;"
+      },
+      "id": "10846fca-af08-4387-b339-956c47db1987"
+    },
+    {
+      "name": "Check conv",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const chatId = $input.first().json.chatId;\nif (!chatId) return { exists: false, chatId: '' };\n\nconst res = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.notion.com/v1/databases/38c15cc8-89a0-81b3-9890-cee60d8a9ab0/query',\n  headers: {\n    'Authorization': 'Bearer PLACEHOLDER_NOTION_TOKEN_SOPS',\n    'Notion-Version': '2022-06-28'\n  },\n  body: {\n    filter: { property: 'Conversation ID', rich_text: { equals: chatId } },\n    page_size: 1\n  }\n});\n\nconst page = res.results?.[0];\nif (page) {\n  const p = page.properties;\n  return { exists:true, pageId:page.id, chatId,\n    oldResume:p['Résumé']?.rich_text?.[0]?.plain_text||'',\n    oldSujet:p['Sujet']?.title?.[0]?.plain_text||'',\n    oldStatus:p['Statut']?.select?.name||'🟡 En cours'\n  };\n}\nreturn { exists:false, chatId };"
+      },
+      "id": "237f7f47-7d14-487b-93cc-b313ec9a767a"
+    },
+    {
+      "name": "Existe ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        900,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e",
+              "leftValue": "={{ $json.exists }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b0cbbc08-be46-4a14-a6da-db7afa00d7b5"
+    },
+    {
+      "name": "Format append",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -200
+      ],
+      "parameters": {
+        "jsCode": "const {oldResume,oldSujet,pageId,chatId,oldStatus} = $input.first().json;\nconst msg = $('Parse Teams').first().json;\nreturn {\n  _mode:'append', pageId, chatId, oldResume, oldSujet,\n  newMsg:'['+msg.senderName+']: '+msg.messageText,\n  lastInterv:msg.isFromWylliam?'Wylliam':'Autre', oldStatus,\n  senderName:msg.senderName, messageLink:msg.messageLink,\n  isMentioned:msg.isMentioned, isDirectMessage:msg.isDirectMessage,\n  isDirectlyAddressed:(msg.isMentioned||msg.isDirectMessage)?'Oui':'Non'\n};"
+      },
+      "id": "3405921a-6ade-430f-9dea-395a25420f2e"
+    },
+    {
+      "name": "Self filter",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1200,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "s",
+              "leftValue": "={{ $json.isFromWylliam }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "83772ff9-4449-47d6-99c8-ceb6a8ca3e89"
+    },
+    {
+      "name": "Format new",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const msg=$('Parse Teams').first().json;\nreturn {\n  _mode:'new', chatId:msg.chatId, messageLink:msg.messageLink,\n  senderName:msg.senderName, messageText:msg.messageText,\n  lastInterv:'Autre',\n  isMentioned:msg.isMentioned, isDirectMessage:msg.isDirectMessage,\n  isDirectlyAddressed:(msg.isMentioned||msg.isDirectMessage)?'Oui':'Non'\n};"
+      },
+      "id": "93fd6a63-422f-4653-a1ee-3bb49ab01b50"
+    },
+    {
+      "name": "LLM Smart",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1800,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json._mode === 'append' ? '[CONTEXTE CONV] Sujet: '+$json.oldSujet+' | Résumé: '+$json.oldResume+' | Nouveau: '+$json.newMsg+'\\nPour moi: '+$json.isDirectlyAddressed+'\\nTâche: (1) Détecte si ce nouveau message contient UNE NOUVELLE action. (2) Mets à jour la liste des actions en cours.\\nJSON: {sujet:\\\"sujet\\\",actions:[\\\"🔴 action1\\\",\\\"✅ action2\\\"],dernier_msg:\\\"résumé\\\",action:\\\"Faire|Planifier|Déléguer|Référence|Supprimer\\\",titre_action:\\\"nouvelle action si pertinent\\\",contexte:\\\"contexte\\\",confiance:\\\"Certain|À vérifier\\\"}' : '[NOUVEAU MESSAGE TEAMS]\\nDe: '+$json.senderName+'\\nMessage: '+$json.messageText+'\\nPour moi: '+$json.isDirectlyAddressed+'\\n\\nJSON OUTPUT: {\\\"action\\\":\\\"Faire|Planifier|Déléguer|Référence|Supprimer\\\",\\\"sujet\\\":\\\"titre court\\\",\\\"contexte\\\":\\\"contexte\\\",\\\"confiance\\\":\\\"Certain|À vérifier\\\"}'",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Tu es l'assistant GTD de Wylliam Delaunay, Product Manager chez onepoint (expertise compta, Nexcer/Kinexo).\n\nAnalyse les messages Teams et classe-les dans une catégorie GTD précise.\n\nRÈGLES DE CLASSIFICATION STRICTES :\n\n➡️ FAIRE (action dans 48-72h)\n- Question POSÉE directement à Wylliam\n- \"Peux-tu\", \"est-ce que tu peux\", \"j'ai besoin que tu\"\n- @mention avec demande explicite\n- Validation, décision, avis attendu de sa part\n- Demande de doc, d'info spécifique, de retour\n\n📅 PLANIFIER (action >3 jours)\n- \"Il faudrait qu'on se voie\", \"on devrait prévoir\"\n- Proposition de réunion, point à caler\n- Sujet à aborder plus tard, pas urgent\n\n👤 DÉLÉGUER (quelqu'un d'autre exécute)\n- Demande pour l'équipe de Wylliam\n- Action à faire par un développeur\n- \"Ton équipe peut-elle\", \"passe le mot à\"\n\n📁 RÉFÉRENCE (info utile, pas d'action)\n- Mise à jour de statut\n- Information sans question ni demande\n- Lien partagé sans contexte d'action\n\n🗑️ SUPPRIMER (rien à garder)\n- Message de Wylliam lui-même\n- Simple remerciement, \"ok\", \"merci\"\n- Notification système, bot, message vide\n\nRÈGLE D'OR : En cas de doute → penche vers FAIRE.\nSi le message contient une question explicite → c'est FAIRE.\n\nSORS UNIQUEMENT DU JSON : {\"action\":\"Faire|Planifier|Déléguer|Référence|Supprimer\",\"sujet\":\"verbe + objet court\",\"contexte\":\"contexte en 1 phrase max\",\"confiance\":\"Certain|À vérifier\"}\n⚠️ RÈGLE CRITIQUE — DESTINATAIRE DU MESSAGE :\n\nLe champ \"Pour moi\" t'indique si le message est directement adressé à Wylliam :\n- 🟢 \"Pour moi: Oui\" = message direct (1:1) OU Wylliam est @mentionné → peut être une action pour lui\n- 🟡 \"Pour moi: Non\" = chat de groupe, Wylliam non mentionné → INFO PARTAGÉE, pas une action pour lui\n\nRÈGLE : Si \"Pour moi: Non\" ET que le message est une demande technique, un statut, une information sans question directe à Wylliam → classe en 📁 RÉFÉRENCE.\nSi \"Pour moi: Non\" mais la question est explicitement posée à Wylliam (\"Wylliam, peux-tu...\") → classe normalement (la mention a pu manquer).\n"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 800,
+          "temperature": 0.1
+        },
+        "passthrough": true
+      },
+      "id": "df56100f-2707-495e-81fa-ba952f5a6f8f"
+    },
+    {
+      "name": "Haiku 4.5",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1920,
+        200
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "7h7iCjgmfwc33UgQ",
+          "name": "Anthropic account"
+        }
+      },
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "id": "30beebe2-393d-4291-92ea-633fff0a99d2"
+    },
+    {
+      "name": "Mode ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2100,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "m",
+              "leftValue": "={{ $json._mode }}",
+              "rightValue": "=append",
+              "operator": {
+                "type": "string",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "f22b06d4-ec56-4003-b80c-f484dbac6ee8"
+    },
+    {
+      "name": "Update Notion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        -200
+      ],
+      "parameters": {
+        "jsCode": "const llm = $input.first().json;\nconst ap = $('Format append').first().json;\nconst actions = Array.isArray(llm.actions) ? llm.actions.join('\\n') : '';\nlet resume = actions;\nif (llm.dernier_msg) resume += '\\n💬 '+llm.dernier_msg;\nconst sujet = llm.sujet||ap.oldSujet||'Action Teams';\n\nawait this.helpers.httpRequest({\n  method: 'PATCH',\n  url: 'https://api.notion.com/v1/pages/'+ap.pageId,\n  headers: {'Authorization':'Bearer PLACEHOLDER_NOTION_TOKEN_SOPS','Notion-Version':'2022-06-28'},\n  body: {properties:{\n    'Sujet':{title:[{text:{content:sujet.substring(0,100)}}]},\n    'Résumé':{rich_text:[{text:{content:resume.substring(0,1900)}}]},\n    'Dernier intervenant':{select:{name:ap.lastInterv}},\n    'Dernière activité':{date:{start:new Date().toISOString()}},\n    'Statut':{select:{name:(ap.lastInterv==='Wylliam' && ap.oldStatus==='🔴 À promouvoir')?'✅ Clos':'🟡 En cours'}},\n            'Ne pas promouvoir':{checkbox:ap.isDirectlyAddressed==='Non'}\n  }}\n});\nreturn {action:'updated',chatId:ap.chatId,sujet};"
+      },
+      "id": "66d0c7c9-9253-4b4f-957f-b3104143185f"
+    },
+    {
+      "name": "Action Filter",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2400,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "=Faire",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "b",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "=Planifier",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "c",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "=Déléguer",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "d22be6fc-4086-4454-be20-af9d409c8b64"
+    },
+    {
+      "name": "Create Notion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2700,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const llm = $input.first().json;\nconst fn = $('Format new').first().json;\nconst action = (llm.action||'').trim();\nconst sujet = llm.sujet||llm.titre_action||'Action Teams';\nconst contexte = llm.contexte||'';\nconst confiance = llm.confiance||'À vérifier';\nconst isActionable = action==='Faire' || action==='Planifier' || action==='Déléguer';\n\n// 1. TOUJOURS créer l'entrée dans Teams En Cours (pour suivi/auto-closure)\nawait this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.notion.com/v1/pages',\n  headers: {'Authorization':'Bearer PLACEHOLDER_NOTION_TOKEN_SOPS','Notion-Version':'2022-06-28'},\n  body: {parent:{database_id:'38c15cc8-89a0-81b3-9890-cee60d8a9ab0'},properties:{\n    'Sujet':{title:[{text:{content:sujet.substring(0,100)}}]},\n    'Conversation ID':{rich_text:[{text:{content:fn.chatId||'n/a'}}]},\n    'Résumé':{rich_text:[{text:{content:(sujet+': '+contexte).substring(0,500)}}]},\n    'Lien Teams':{url:fn.messageLink||null},\n    'Statut':{select:{name:isActionable?'🔴 À promouvoir':'🟡 En cours'}},\n    'Dernier intervenant':{select:{name:fn.senderName||'Autre'}},\n    'Dernière activité':{date:{start:new Date().toISOString()}},\n    'Ne pas promouvoir':{checkbox:fn.isDirectlyAddressed==='Non'}\n  }}\n});\n\n// 2. Si action Faire/Planifier/Déléguer → créer aussi dans Inbox GTD\nif (isActionable) {\n  const actionEmoji = action==='Faire'?'➡️':(action==='Planifier'?'📅':'👤');\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.notion.com/v1/pages',\n    headers: {'Authorization':'Bearer PLACEHOLDER_NOTION_TOKEN_SOPS','Notion-Version':'2022-06-28'},\n    body: {parent:{database_id:'6b279b50-1f54-4b57-b96d-919c5f667730'},properties:{\n      'Capture':{title:[{text:{content:(actionEmoji+' '+sujet).substring(0,100)}}]},\n      'Action':{select:{name:actionEmoji+' '+action}},\n      'Confiance':{select:{name:confiance.includes('Certain')?'✅ Certain':'🟡 À vérifier'}},\n      'Notes':{rich_text:[{text:{content:contexte.substring(0,500)}}]},\n      'Lien Source':{url:fn.messageLink||null},\n      'Source':{select:{name:'💬 Teams'}},\n      'Traité':{checkbox:false}\n    }}\n  });\n}\n\nreturn {action:(isActionable?'promoted':'logged'),chatId:fn.chatId,sujet};"
+      },
+      "id": "87086752-5aca-4305-a8c7-2041467dc046"
+    },
+    {
+      "id": "3e65f9b0-7335-4d71-abb8-580bec5c70eb",
+      "name": "Parse LLM Output",
+      "typeVersion": 2,
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1950,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Parse LLM Output — extrait le JSON de la réponse textuelle du LLM\nconst raw = $input.first().json;\nconst text = raw.text || raw.output || '';\n\n// Stratégie 1: extraire le JSON depuis un bloc markdown ```json ... ```\nlet jsonStr = text;\nconst blockMatch = text.match(/```(?:json)?\\s*\\n?([\\s\\S]*?)```/);\nif (blockMatch) {\n  jsonStr = blockMatch[1].trim();\n}\n\n// Stratégie 2: trouver le premier objet JSON valide dans le texte\nlet parsed = {};\ntry {\n  parsed = JSON.parse(jsonStr);\n} catch (e) {\n  const depth = (s) => { let d=0; for(let c of s){if(c==='{')d++;if(c==='}')d--;if(d<0)return -1} return d; };\n  for (let i = 0; i < text.length; i++) {\n    if (text[i] === '{') {\n      for (let j = i+1; j <= text.length; j++) {\n        if (depth(text.substring(i, j)) === 0) {\n          try {\n            parsed = JSON.parse(text.substring(i, j));\n            break;\n          } catch (e2) {}\n        }\n      }\n      if (parsed.action) break;\n    }\n  }\n}\n\n// Fusionne les champs passthrough + LLM parsé\nreturn {\n  ...raw,              // _mode, chatId, senderName, etc. (grâce au passthrough activé)\n  ...parsed,           // action, sujet, contexte, confiance, actions[], dernier_msg, titre_action\n  _llmRaw: text        // garde le raw pour debug\n};"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Teams",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Teams": {
+      "main": [
+        [
+          {
+            "node": "Check conv",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check conv": {
+      "main": [
+        [
+          {
+            "node": "Existe ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existe ?": {
+      "main": [
+        [
+          {
+            "node": "Format append",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Self filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Self filter": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Format new",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format append": {
+      "main": [
+        [
+          {
+            "node": "LLM Smart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format new": {
+      "main": [
+        [
+          {
+            "node": "LLM Smart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Smart": {
+      "main": [
+        [
+          {
+            "node": "Parse LLM Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Haiku 4.5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "LLM Smart",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mode ?": {
+      "main": [
+        [
+          {
+            "node": "Update Notion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Action Filter": {
+      "main": [
+        [
+          {
+            "node": "Create Notion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Parse LLM Output": {
+      "main": [
+        [
+          {
+            "node": "Mode ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "073e9edb-d94c-4b49-be12-07631ce4a72d",
+  "activeVersionId": "073e9edb-d94c-4b49-be12-07631ce4a72d",
+  "versionCounter": 87,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-27T10:52:03.364Z",
+      "createdAt": "2026-06-27T10:52:03.364Z",
+      "role": "workflow:owner",
+      "workflowId": "9q1JSTfeQDkd8pVO",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

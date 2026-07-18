@@ -1,0 +1,532 @@
+{
+  "updatedAt": "2026-05-01T06:49:46.282Z",
+  "createdAt": "2025-10-25T15:33:21.068Z",
+  "id": "jdQPB6EqqdSk0du7",
+  "name": "ask-report-project",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -704,
+        -16
+      ],
+      "id": "9b039043-c92b-408e-87fd-05195358be88",
+      "name": "Telegram Trigger",
+      "webhookId": "55662155-ad0f-4aed-80ed-7a2d32dd369b",
+      "credentials": {
+        "telegramApi": {
+          "id": "Dv3t4Xfl9b25wku5",
+          "name": "pdp_nexcer_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "Donne moi 1 minute ...",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -496,
+        -16
+      ],
+      "id": "c46da76a-6b6a-44b7-8756-e5789aab1299",
+      "name": "Send a text message",
+      "webhookId": "a5769cbe-dde3-43d6-b1a2-e89b44d4a1b4",
+      "credentials": {
+        "telegramApi": {
+          "id": "ihZuIM3ZQcKsWsu9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.voice.file_id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notExists",
+                      "singleValue": true
+                    },
+                    "id": "b8cfed5f-d4c4-4f29-b735-81c2db137aa6"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Texte"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "be9554ba-23a5-4d8c-8b0c-a6c1216413cb",
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.voice.file_id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Audio"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -320,
+        -16
+      ],
+      "id": "6652993a-7e34-43a8-9b78-3542dc502a8c",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Telegram Trigger').item.json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -112,
+        80
+      ],
+      "id": "d0c92e23-d3cb-4505-9a68-d5bd0db22b83",
+      "name": "Get audio file",
+      "webhookId": "816df25f-ca13-4e4d-94e2-6f6bf8c6e08b",
+      "credentials": {
+        "telegramApi": {
+          "id": "ihZuIM3ZQcKsWsu9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        96,
+        80
+      ],
+      "id": "9144dd7b-fadd-4982-a4c0-0114082eec97",
+      "name": "Transcribe Audio",
+      "credentials": {
+        "openAiApi": {
+          "id": "cZJg7tCb3YEl2Af1",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $('PILOTE').item.json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        -64
+      ],
+      "id": "54ed09ea-d7d0-442d-a529-2bb72e9656a8",
+      "name": "Send a text message1",
+      "webhookId": "b177fc93-1559-4c75-84f2-2000898ce673",
+      "credentials": {
+        "telegramApi": {
+          "id": "ihZuIM3ZQcKsWsu9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Return_All', ``, 'boolean') }}",
+        "options": {
+          "fields": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Fields', ``, 'string') }}",
+          "jql": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('JQL', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.jiraTool",
+      "typeVersion": 1,
+      "position": [
+        400,
+        240
+      ],
+      "id": "03376341-eacf-4647-9366-a53b57bbe0d4",
+      "name": "Get many issues in Jira Software",
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "NtKd12PB04jqpabw",
+          "name": "Jira SW Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pageId": {
+          "__rl": true,
+          "value": "https://www.notion.so/Rapports-Projets-Automatis-s-2e115cc889a0809c935cdb3f1b0339d1",
+          "mode": "url"
+        },
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', ``, 'string') }}",
+        "blockUi": {
+          "blockValues": [
+            {
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('blockValues0_text0_Text', ``, 'string') }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('blockValues1_text0_Text', ``, 'string') }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('blockValues2_text0_Text', ``, 'string') }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('blockValues3_text0_Text', ``, 'string') }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 2.2,
+      "position": [
+        704,
+        464
+      ],
+      "id": "e80094c2-fa88-4742-8f69-8aa7a6550c94",
+      "name": "Create a page in Notion",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "options": {
+          "systemMessage": "=# 🎨 DESIGNER - Expert Création de Rapports Notion\nDate du jour : {{ $now }}\n\nTu es un **analyste senior** qui transforme les données JIRA brutes en rapports Notion professionnels, visuels et actionnables pour le comité de direction.\n\n## 🎯 MISSION\n1. Recevoir les données JIRA du RAPPORTEUR\n2. Analyser et calculer les métriques\n3. Créer une page Notion structurée en 4 blocks\n4. **Retourner au RAPPORTEUR** : résumé + lien Notion\n\n## 📊 MÉTRIQUES À CALCULER\n\n### Indicateurs clés\n- **Vélocité** : `Tâches Done / Total tâches × 100`\n- **Taux de complétion** : `Done / (To Do + In Progress + Done) × 100`\n- **Cycle time moyen** : Jours entre création et résolution\n- **Tâches bloquées** : Count status = Blocked ou stagnantes > 7j\n- **Score de santé** : `(vélocité × 0.4) + (taux_completion × 0.3) + ((100 - %bloquées) × 0.3)`\n\n### Répartition\n- Distribution par statut (To Do / In Progress / Done / Blocked)\n- Top 5 développeurs (nombre de tâches + répartition)\n- Sujets principaux (via components/labels)\n\n## 📝 STRUCTURE DES 4 BLOCKS NOTION\n\n### BLOCK_01 : En-tête & Synthèse Executive\n```\n- heading_1 : \"📊 Rapport [Projet] - [Période]\"\n- callout (icône 🎯, couleur selon score) : Score santé + message clé\n- paragraph : Résumé sprint en 2-3 phrases\n- divider\n```\n\n### BLOCK_02 : Métriques & KPIs\n```\n- heading_2 : \"📈 Indicateurs Clés\"\n- callout (🟢/🟡/🟠/🔴) : Vélocité XX% [+ insight]\n- callout : Taux complétion XX% [+ insight]\n- callout : Cycle time X.Xj [+ insight]\n- callout : Tâches bloquées X [+ liste si > 0]\n- paragraph : Mini graphique ASCII ou tableau formaté\n```\n\n### BLOCK_03 : Analyse Détaillée\n```\n- heading_2 : \"👥 Répartition & Performance\"\n- toggle : \"Par Développeur\" → bulleted_list (Top 5 avec stats)\n- toggle : \"Par Statut\" → détails To Do/In Progress/Done/Blocked\n- heading_3 : \"🔥 Sujets du Moment\"\n- numbered_list : Top 3 sujets avec nombre de tâches\n- quote : Insight principal ou pattern identifié\n```\n\n### BLOCK_04 : Actions & Recommandations\n```\n- heading_2 : \"🎬 Points d'Attention & Actions\"\n- callout (🚨 red) : Si tâches critiques bloquées\n- callout (⚠️ orange) : Si risques identifiés\n- callout (💡 blue) : Recommandation stratégique\n- to_do : Liste 3-5 actions concrètes\n- divider\n- paragraph : \"Généré le [date] • Données JIRA [période]\"\n```\n\n## 🎨 RÈGLES DE FORMATTING\n\n### Rich Text Notion\n- **Gras** : `[{\"text\": {\"content\": \"...\", \"bold\": true}}]`\n- *Italique* : `[{\"text\": {\"content\": \"...\", \"italic\": true}}]`\n- Couleur : `\"annotations\": {\"color\": \"red\"}`\n- Lien : `[{\"text\": {\"content\": \"...\", \"link\": {\"url\": \"...\"}}}]`\n\n### Emojis cohérents\n- 📊 Rapport | 🎯 Objectif | 📈 Métrique | 👥 Équipe | 🔥 Important\n- ✅ Succès | ⚠️ Attention | 🚨 Urgent | 💡 Insight | ⚡ Action\n\n### Couleurs callout selon score\n- `green_background` : Score > 80\n- `yellow_background` : Score 60-80\n- `orange_background` : Score 40-60\n- `red_background` : Score < 40\n\n## 🔧 FORMAT JSON DE SORTIE\n```json\n{\n  \"title\": \"string\",\n  \"block_01\": [\n    { \"type\": \"heading_1\", \"heading_1\": { \"rich_text\": [{ \"text\": { \"content\": \"...\" } }] } },\n    { \"type\": \"paragraph\", \"paragraph\": { \"rich_text\": [{ \"text\": { \"content\": \"...\" } }] } },\n    { \"type\": \"bulleted_list_item\", \"bulleted_list_item\": { \"rich_text\": [{ \"text\": { \"content\": \"...\" } }] } }\n  ],\n  \"block_02\": [ ... ],\n  \"block_03\": [ ... ],\n  \"block_04\": [ ... ]\n}\n```\n\n## ⚙️ PROCESSUS\n\n1. **Recevoir** : JSON du RAPPORTEUR avec données JIRA brutes\n2. **Analyser** : Calculer toutes les métriques + identifier insights\n3. **Structurer** : Créer les 4 blocks avec contenu riche\n4. **Créer** : Appeler l'API Notion avec le payload JSON\n5. **Retourner au RAPPORTEUR** : Résumé en 2-3 lignes + lien page Notion\n\n## 💬 RÉPONSE AU RAPPORTEUR (OBLIGATOIRE)\n\n**Format strict à respecter :**\n```\nRÉSUMÉ: [Score emoji] Score [XX]/100 • [Métrique clé] • [Point d'attention principal]\nLIEN: https://notion.so/[page_id]\n```\n\n**Exemples :**\n```\nRÉSUMÉ: 🟢 Score 82/100 • Vélocité 78% (24/31 tâches) • 2 tâches bloquées nécessitent attention\nLIEN: https://notion.so/Rapport-Kinexo-S43-abc123def456\n```\n```\nRÉSUMÉ: 🟡 Score 68/100 • 18 tâches complétées • Alice Martin top performer (9 tâches done)\nLIEN: https://notion.so/Rapport-MyKinexo-Oct-xyz789\n```\n```\nRÉSUMÉ: 🟠 Score 55/100 • Vélocité faible 45% • 5 tâches stagnantes > 10j - action urgente requise\nLIEN: https://notion.so/Rapport-Ediflux-Q4-mno345\n```\n\n## 🎯 CRITÈRES QUALITÉ\n\n✅ 4 blocks bien structurés (< 2000 char chacun)\n✅ Visuellement scannable en 30 secondes\n✅ Au moins 2 insights non-évidents révélés\n✅ Actions concrètes avec contexte\n✅ Emojis + couleurs cohérents\n✅ **Réponse au RAPPORTEUR avec résumé + lien**\n\n## 🚫 INTERDICTIONS\n\n❌ Listes brutes sans analyse\n❌ Blocks > 2000 caractères\n❌ Métriques sans contexte\n❌ Texte non formaté (utilise gras/italique)\n❌ **Oublier de retourner résumé + lien au RAPPORTEUR**\n\n## 🧠 INTELLIGENCE ANALYTIQUE\n\nNe te contente pas de présenter les chiffres :\n- **Pattern** : \"3 tâches bloquées toutes liées à l'API externe\"\n- **Tendance** : \"+12% vélocité vs sprint précédent\"\n- **Risque** : \"5 tâches sans activité > 10j menacent le sprint\"\n- **Opportunité** : \"Alice a terminé tous ses tickets, peut prendre charge critique\"\n\n**RAPPEL** : Tu es un analyste créatif, pas un simple formateur de données. Révèle ce qui compte vraiment, puis **retourne impérativement** le résumé et le lien au RAPPORTEUR."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 2.2,
+      "position": [
+        528,
+        240
+      ],
+      "id": "5ff88471-d771-4502-bd64-8f3999666cec",
+      "name": "DESIGNER"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# CONTEXTE :\n{{ $('Telegram Trigger').item.json.message.text ?? $('Transcribe Audio').item.json.text }}\n\nDate du jour : {{ $now }}",
+        "options": {
+          "systemMessage": "=# 🔍 RAPPORTEUR - Agent d'Extraction JIRA\n\nTu es un **expert en extraction de données JIRA** qui collecte les tâches et transmet les données brutes au DESIGNER pour génération de rapport Notion.\n\nDate du jour : {{ $now }}\n\n## 🎯 MISSION\n1. Comprendre la demande utilisateur (même mal transcrite)\n2. Construire et exécuter la requête JQL\n3. Transmettre les données brutes au DESIGNER\n4. Retourner le résumé + lien Notion à l'utilisateur\n\n## 📋 PROJETS DISPONIBLES\n\n| Nom | Variantes | JQL |\n|-----|-----------|-----|\n| **Kinexo** | kinexo, kinéxo, kineko, kynexo | `project = KNX` |\n| **MyKinexo** | mykinexo, my kinexo, mai kinexo | `project = MYK` |\n| **Ediflux** | ediflux, édiflux, édiflex | `project in (PEDI, SEF)` |\n| **PDP** | pdp, pa, papdp | `project in (PAPDP)` |\n\n**Tous les projets :** `project in (KNX, MYK, PEDI, SEF)`\n\n## 📅 PÉRIODES\n\n| Expression | JQL |\n|-----------|-----|\n| \"cette semaine\" / non précisé | `-7d` |\n| \"ce mois\" | `-30d` |\n| \"sprint\" | `-14d` |\n| \"trimestre\" | `-90d` |\n\n## 🔧 REQUÊTE JIRA\n\n### Champs à récupérer\n```\nfields=key,summary,status,assignee,priority,created,updated,issuetype\n```\n\n### Template JQL\n```jql\nproject [= ou in] \"[codes]\" \nAND updated >= -[période]\nAND type != Epic\nORDER BY updated DESC\n```\n\n## ⚙️ PROCESSUS\n\n1. **Analyser** : Corriger transcription → Identifier projet + période\n2. **Extraire** : Exécuter requête JQL → Récupérer données brutes\n3. **Transmettre** : Envoyer JSON complet au DESIGNER (sans interprétation)\n4. **Retourner** : Message + lien Notion reçu du DESIGNER\n\n## 💬 FORMAT DE SORTIE\n\n### Vers l'utilisateur\n```\n✨ Rapport [PROJET] généré !\n📊 [Résumé du DESIGNER en 2-3 lignes]\n🔗 Lien Notion : [URL]\n```\n\n### Vers le DESIGNER\n- DIRECTEMENT ce que tu reçois de Jira\n\n## ⚠️ GESTION ERREURS\n\n- **Projet inconnu** : Lister les 3 projets + demander précision\n- **API erreur** : Signaler problème technique\n- **0 résultat** : Informer + suggérer élargir période\n\n## 🚫 INTERDICTIONS\n\n❌ N'interprète JAMAIS les résultats JIRA\n❌ Ne calcule AUCUNE métrique\n❌ Ne formate PAS de rapport\n👉 Ta mission = EXTRAIRE et TRANSMETTRE uniquement"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -64
+      ],
+      "id": "0d3e2039-591f-4a3e-8ae3-6758b6ec8dff",
+      "name": "PILOTE"
+    },
+    {
+      "parameters": {
+        "model": "anthropic/claude-3.5-sonnet",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        480,
+        464
+      ],
+      "id": "db2f4da4-f103-460c-b60d-5dcdad9b8cde",
+      "name": "Sonnet 3.5",
+      "credentials": {
+        "openRouterApi": {
+          "id": "V1vjafIa6ffAVKgH",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "anthropic/claude-haiku-4.5",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        224,
+        240
+      ],
+      "id": "29b35f81-3b90-4d78-8659-a63e8ddb6276",
+      "name": "Haiku 4.5",
+      "credentials": {
+        "openRouterApi": {
+          "id": "V1vjafIa6ffAVKgH",
+          "name": "OpenRouter account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "PILOTE",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get audio file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get audio file": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Audio": {
+      "main": [
+        [
+          {
+            "node": "PILOTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many issues in Jira Software": {
+      "ai_tool": [
+        [
+          {
+            "node": "PILOTE",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a page in Notion": {
+      "ai_tool": [
+        [
+          {
+            "node": "DESIGNER",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DESIGNER": {
+      "ai_tool": [
+        [
+          {
+            "node": "PILOTE",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PILOTE": {
+      "main": [
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sonnet 3.5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "DESIGNER",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Haiku 4.5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "PILOTE",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "1535627a-398f-420a-bdbe-d4a9cb987f2c",
+  "activeVersionId": null,
+  "versionCounter": 20,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2025-10-25T15:33:21.073Z",
+      "createdAt": "2025-10-25T15:33:21.073Z",
+      "role": "workflow:owner",
+      "workflowId": "jdQPB6EqqdSk0du7",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

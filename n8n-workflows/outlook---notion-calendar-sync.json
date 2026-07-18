@@ -1,0 +1,494 @@
+{
+  "updatedAt": "2026-04-09T13:55:20.259Z",
+  "createdAt": "2026-03-24T12:55:45.657Z",
+  "id": "E_s_W8XbsDoihoC0UiLBG",
+  "name": "Outlook → Notion Calendar Sync",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// L'entrée réelle : body.event.bodyPreview est une STRING JSON à parser\nconst input = $input.first().json;\nconst eventWrapper = input.body?.event ?? input.event ?? input;\nconst raw = eventWrapper.bodyPreview ?? eventWrapper.body ?? eventWrapper;\nconst e = typeof raw === 'string' ? JSON.parse(raw) : raw;\n\n// 🛑 Guard : ignorer les événements sans titre réel\nconst subject = e.subject || '';\nif (subject.trim() === 'Nouvel événement') {\n  return []; // Stoppe le flux — aucune donnée sortante\n}\n\nconst stripHtml = s => (s || '').replace(/<[^>]*>/g, '').trim().slice(0, 2000);\n\nconst catMap = {\n  'MyKinexo': '🔵 MyKinexo',\n  'Ediflux':  '🟠 Ediflux',\n  'CODIR':    '🟣 CODIR',\n  'Formation':'🟡 Formation',\n  'Perso':    '⚫ Perso'\n};\nconst cats = Array.isArray(e.categories) ? e.categories : [];\nconst matchedCat = cats.find(c => catMap[c]);\nconst categorie = matchedCat ? catMap[matchedCat] : '⚪ Autre';\n\nconst isRecurring = (e.recurrence || 'none') !== 'none';\n\nconst action = (e.ActionType || '').toLowerCase();\nconst responseType = (e.responseType || '').toLowerCase();\n\n// Outlook ne renvoie jamais \"deleted\" — une suppression/refus arrive comme \"updated\" avec responseType \"declined\"\nconst isDeleted = action === 'deleted' || responseType === 'declined';\nconst effectiveAction = isDeleted ? 'deleted' : action;\n\nlet statutSync;\nif (isDeleted)              { statutSync = '🗑️ Supprimé'; }\nelse if (action === 'updated') { statutSync = '🔄 Modifié'; }\nelse                           { statutSync = '✅ Actif'; }\n\nreturn [{\n  json: {\n    actionType: effectiveAction,\n    iCalUId:      e.iCalUId || '',\n    subject:      e.subject || '(sans titre)',\n    start:        e.startWithTimeZone || e.start || '',\n    end:          e.endWithTimeZone   || e.end   || '',\n    isAllDay:     e.isAllDay === true,\n    organizer:    e.organizer || '',\n    participants: [e.requiredAttendees, e.optionalAttendees].filter(Boolean).join(', '),\n    location:     e.location || e.webLink || '',\n    body:         stripHtml(e.body),\n    recurrence:   e.recurrence || 'none',\n    isRecurring,\n    lastModified: e.lastModifiedDateTime || new Date().toISOString(),\n    now:          new Date().toISOString(),\n    categorie,\n    statutSync,\n    statutActif:  '✅ Actif'\n  }\n}];"
+      },
+      "name": "Parse & Map",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -624,
+        256
+      ],
+      "id": "c930df05-6fd2-46ab-8a9a-57f10f214017"
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "output": "={{ $json.actionType === 'deleted' ? 1 : 0 }}"
+      },
+      "name": "Switch ActionType",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -400,
+        224
+      ],
+      "id": "4b45ab4a-35a5-426e-92df-61c83ee2d4d2"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": "37ac8c1d942045a28d2cfc8ed8d74aac",
+        "limit": 1,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Event ID|rich_text",
+              "condition": "equals"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Search Notion (delete)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        -176,
+        352
+      ],
+      "id": "30fbe685-9e01-4230-ae4c-0c35dc6b2eec",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Search Notion (delete)').item.json.id }}",
+          "mode": "id",
+          "__regex": "^([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Statut Sync|select",
+              "selectValue": "={{ $('Parse & Map').item.json.statutSync }}"
+            },
+            {
+              "key": "Dernière sync|date",
+              "date": "={{ $('Parse & Map').item.json.lastModified }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Mark Supprime",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        48,
+        352
+      ],
+      "id": "718dcb5e-4e16-4211-9f03-9742dd521efb",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "outlook-event",
+        "options": {}
+      },
+      "name": "Webhook1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        256
+      ],
+      "id": "a3485c87-61c6-4b76-b44f-08fcdfc413dd",
+      "webhookId": "1b520ca2-84cc-4af0-b354-969a7604f27d"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "37ac8c1d942045a28d2cfc8ed8d74aac",
+          "mode": "id"
+        },
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Event ID|rich_text",
+              "condition": "equals",
+              "richTextValue": "={{ $('Parse & Map').item.json.iCalUId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Search Notion (upsert)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        -176,
+        160
+      ],
+      "id": "cce63e23-b0a5-4b10-9354-57ae8d6c0256",
+      "alwaysOutputData": true,
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "id": "79654b03-48ed-467b-bfd6-7efc35fb7359"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF Page Found1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        48,
+        144
+      ],
+      "id": "efdbcd7f-176a-4b71-a193-c89f2f6acdfa"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Search Notion (upsert)').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Titre|title",
+              "title": "={{ $('Parse & Map').item.json.subject }}"
+            },
+            {
+              "key": "Statut Sync|select",
+              "selectValue": "={{ $('Parse & Map').item.json.statutSync }}"
+            },
+            {
+              "key": "Début|date",
+              "date": "={{ $('Parse & Map').item.json.start }}"
+            },
+            {
+              "key": "Fin|date",
+              "date": "={{ $('Parse & Map').item.json.end }}"
+            },
+            {
+              "key": "Toute la journée|checkbox",
+              "checkboxValue": "={{ $('Parse & Map').item.json.isAllDay }}"
+            },
+            {
+              "key": "Organisateur|rich_text",
+              "textContent": "={{ $('Parse & Map').item.json.organizer }}"
+            },
+            {
+              "key": "Participants|rich_text",
+              "textContent": "={{ $('Parse & Map').item.json.participants }}"
+            },
+            {
+              "key": "Lieu / Lien|rich_text",
+              "textContent": "={{ $('Parse & Map').item.json.location }}"
+            },
+            {
+              "key": "Corps / Agenda|rich_text",
+              "richText": true,
+              "text": {
+                "text": [
+                  {
+                    "text": "={{ $('Parse & Map').item.json.body }}",
+                    "annotationUi": {}
+                  }
+                ]
+              }
+            },
+            {
+              "key": "Récurrent|checkbox",
+              "checkboxValue": "={{ $('Parse & Map').item.json.isRecurring }}"
+            },
+            {
+              "key": "Catégorie|select",
+              "selectValue": "={{ $('Parse & Map').item.json.categorie }}"
+            },
+            {
+              "key": "Dernière sync|date",
+              "date": "={{ $('Parse & Map').item.json.now }}"
+            },
+            {
+              "key": "Calendrier|rich_text",
+              "textContent": "Outlook"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Update Notion Page",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        272,
+        0
+      ],
+      "id": "a8bed4c2-b82d-417c-aa61-735a6967e54c",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "37ac8c1d942045a28d2cfc8ed8d74aac",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Titre|title",
+              "title": "={{ $('Parse & Map').item.json.subject }}"
+            },
+            {
+              "key": "Event ID|rich_text",
+              "textContent": "={{ $('Parse & Map').item.json.iCalUId }}"
+            },
+            {
+              "key": "Statut Sync|select",
+              "selectValue": "={{ $('Parse & Map').item.json.statutActif }}"
+            },
+            {
+              "key": "Début|date",
+              "date": "={{ $('Parse & Map').item.json.start }}"
+            },
+            {
+              "key": "Fin|date",
+              "date": "={{ $('Parse & Map').item.json.end }}"
+            },
+            {
+              "key": "Toute la journée|checkbox",
+              "checkboxValue": "={{ $('Parse & Map').item.json.isAllDay }}"
+            },
+            {
+              "key": "Organisateur|rich_text",
+              "textContent": "={{ $('Parse & Map').item.json.organizer }}"
+            },
+            {
+              "key": "Participants|rich_text",
+              "textContent": "={{ $('Parse & Map').item.json.participants }}"
+            },
+            {
+              "key": "Lieu / Lien|rich_text",
+              "textContent": "={{ $('Parse & Map').item.json.location }}"
+            },
+            {
+              "key": "Corps / Agenda|rich_text",
+              "textContent": "={{ $('Parse & Map').item.json.body }}"
+            },
+            {
+              "key": "Récurrent|checkbox",
+              "checkboxValue": "={{ $('Parse & Map').item.json.isRecurring }}"
+            },
+            {
+              "key": "Catégorie|select",
+              "selectValue": "={{ $('Parse & Map').item.json.categorie }}"
+            },
+            {
+              "key": "Dernière sync|date",
+              "date": "={{ $('Parse & Map').item.json.now }}"
+            },
+            {
+              "key": "Calendrier|rich_text",
+              "textContent": "Outlook"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Create Notion Page",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        272,
+        256
+      ],
+      "id": "823bbd62-98f7-4a36-b18f-2866b8bfd432",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Parse & Map": {
+      "main": [
+        [
+          {
+            "node": "Switch ActionType",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch ActionType": {
+      "main": [
+        [
+          {
+            "node": "Search Notion (upsert)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Search Notion (delete)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Notion (delete)": {
+      "main": [
+        [
+          {
+            "node": "Mark Supprime",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Parse & Map",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Notion (upsert)": {
+      "main": [
+        [
+          {
+            "node": "IF Page Found1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Page Found1": {
+      "main": [
+        [
+          {
+            "node": "Update Notion Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Notion Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "9d25c399-acb6-4604-aef1-12aef344fed7",
+  "activeVersionId": "4cd1adab-b695-4cf2-9a9b-1c520320ce1c",
+  "versionCounter": 17,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-03-24T12:55:45.670Z",
+      "createdAt": "2026-03-24T12:55:45.670Z",
+      "role": "workflow:owner",
+      "workflowId": "E_s_W8XbsDoihoC0UiLBG",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

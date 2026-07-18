@@ -1,6 +1,10 @@
 {
+  "updatedAt": "2026-07-18T08:56:57.166Z",
+  "createdAt": "2026-07-16T20:27:25.924Z",
+  "id": "O0w8hwJBkJaU22Q9",
   "name": "trigger-actus-positives",
-  "description": "",
+  "description": null,
+  "active": true,
   "isArchived": false,
   "nodes": [
     {
@@ -16,8 +20,8 @@
         "rule": {
           "interval": [
             {
-              "triggerAtHour": 6,
-              "triggerAtMinute": 0
+              "field": "cronExpression",
+              "expression": "0 8 * * 6"
             }
           ]
         }
@@ -34,7 +38,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.HERMES_GATEWAY_URL }}/webhooks/factfulness-daily",
+        "url": "http://100.106.174.46:8644/webhooks/factfulness-daily",
         "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
@@ -83,18 +87,9 @@
                 "type": "number",
                 "operation": "largerEqual"
               }
-            },
-            {
-              "id": "status-undefined",
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "isEmpty"
-              }
             }
           ],
-          "combinator": "or"
+          "combinator": "and"
         },
         "looseTypeValidation": true,
         "options": {}
@@ -173,187 +168,37 @@
       ]
     }
   },
+  "meta": null,
   "nodeGroups": [],
   "pinData": null,
+  "versionId": "02481ed6-414d-4d7b-a00f-6ce5d852084c",
+  "activeVersionId": "02481ed6-414d-4d7b-a00f-6ce5d852084c",
+  "versionCounter": 2,
   "triggerCount": 1,
   "sourceWorkflowId": null,
-  "activeVersion": {
-    "updatedAt": "2026-07-16T20:27:25.936Z",
-    "createdAt": "2026-07-16T20:27:25.936Z",
-    "versionId": "a0e13bf9-8d98-4da1-87c4-6a6f2991ebd3",
-    "workflowId": "O0w8hwJBkJaU22Q9",
-    "nodes": [
-      {
-        "id": "schedule-1",
-        "name": "Schedule 6h UTC",
-        "type": "n8n-nodes-base.scheduleTrigger",
-        "typeVersion": 1.3,
-        "position": [
-          0,
-          0
-        ],
-        "parameters": {
-          "rule": {
-            "interval": [
-              {
-                "triggerAtHour": 6,
-                "triggerAtMinute": 0
-              }
-            ]
-          }
-        }
-      },
-      {
-        "id": "http-1",
-        "name": "POST factfulness webhook",
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.2,
-        "position": [
-          300,
-          0
-        ],
-        "parameters": {
-          "method": "POST",
-          "url": "={{ $env.HERMES_GATEWAY_URL }}/webhooks/factfulness-daily",
-          "authentication": "none",
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "X-Hub-Signature-256",
-                "value": "={{ $env.HERMES_WEBHOOK_SIGNATURE }}"
-              },
-              {
-                "name": "Content-Type",
-                "value": "application/json"
-              }
-            ]
-          },
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "{}",
-          "options": {
-            "continueOnFail": true
-          }
-        }
-      },
-      {
-        "id": "if-1",
-        "name": "Erreur ?",
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3,
-        "position": [
-          600,
-          0
-        ],
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "loose",
-              "version": 3
-            },
-            "conditions": [
-              {
-                "id": "status-err",
-                "leftValue": "={{ $json.statusCode }}",
-                "rightValue": 400,
-                "operator": {
-                  "type": "number",
-                  "operation": "largerEqual"
-                }
-              },
-              {
-                "id": "status-undefined",
-                "leftValue": "={{ $json.statusCode }}",
-                "rightValue": "",
-                "operator": {
-                  "type": "string",
-                  "operation": "isEmpty"
-                }
-              }
-            ],
-            "combinator": "or"
-          },
-          "looseTypeValidation": true,
-          "options": {}
-        }
-      },
-      {
-        "id": "tg-1",
-        "name": "Alerte Telegram",
-        "type": "n8n-nodes-base.telegram",
-        "typeVersion": 2,
-        "position": [
-          900,
-          100
-        ],
-        "parameters": {
-          "resource": "message",
-          "operation": "sendMessage",
-          "chatId": "8262789577",
-          "text": "=🚨 *ÉCHEC — Actus Positives*\n\nLe webhook Hermes `factfulness-daily` n'a pas répondu.\n\n- Statut HTTP : `{{ $json.statusCode }}`\n- Erreur : {{ $json.error || 'pas de détail' }}\n- Horodatage : {{ $now }}"
-        },
-        "credentials": {
-          "telegramApi": {
-            "id": "ihZuIM3ZQcKsWsu9",
-            "name": "Telegram account"
-          }
-        },
-        "webhookId": "ac45b9bd-8ee4-4937-8ec9-7ba20087968e"
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-07-16T20:27:25.934Z",
+      "createdAt": "2026-07-16T20:27:25.934Z",
+      "role": "workflow:owner",
+      "workflowId": "O0w8hwJBkJaU22Q9",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
       }
-    ],
-    "connections": {
-      "Schedule 6h UTC": {
-        "main": [
-          [
-            {
-              "node": "POST factfulness webhook",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "POST factfulness webhook": {
-        "main": [
-          [
-            {
-              "node": "Erreur ?",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Erreur ?": {
-        "main": [
-          [
-            {
-              "node": "Alerte Telegram",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          []
-        ]
-      }
-    },
-    "nodeGroups": [],
-    "authors": "Wylliam Delaunay",
+    }
+  ],
+  "versionMetadata": {
     "name": null,
-    "description": null,
-    "autosaved": false,
-    "workflowPublishHistory": [
-      {
-        "createdAt": "2026-07-16T20:27:59.710Z",
-        "id": 290,
-        "workflowId": "O0w8hwJBkJaU22Q9",
-        "versionId": "a0e13bf9-8d98-4da1-87c4-6a6f2991ebd3",
-        "event": "activated",
-        "userId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
-      }
-    ]
+    "description": null
   }
 }

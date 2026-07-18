@@ -1,0 +1,368 @@
+{
+  "updatedAt": "2026-01-11T15:54:02.687Z",
+  "createdAt": "2026-01-11T15:39:03.104Z",
+  "id": "EB1AbwXWSskfEq9ymt62R",
+  "name": "PO Feedback Receiver",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "bae29817-221a-49ea-a949-217df652a175",
+      "name": "Telegram Trigger",
+      "webhookId": "edf67c19-3e10-4d9e-8865-6f31111a8fd5",
+      "credentials": {
+        "telegramApi": {
+          "id": "bT73o9WOxsgD52BV",
+          "name": "Telegram app_decision_details"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2af3f44c-f3c5-456a-9750-e356b1391f2d",
+              "leftValue": "={{ $json.message.text }}",
+              "rightValue": "^US-\\d+\\s*:",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "d5cf7bb1-d555-4815-a604-b3cd64febc98",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "456bec0e-8a39-4c95-8a58-55d11c292d30",
+          "mode": "list",
+          "cachedResultName": "RecipeApp - Backlog",
+          "cachedResultUrl": "https://www.notion.so/456bec0e8a394c958a5855d11c292d30"
+        },
+        "limit": 1,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "ID|rich_text",
+              "condition": "equals",
+              "richTextValue": "={{ $json.storyId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        624,
+        -96
+      ],
+      "id": "94e86dcb-0ce4-489d-9ae1-cee0d027fc2e",
+      "name": "Get many database pages",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a7057b8b-74f0-4737-b56e-c5576b158158",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        832,
+        -96
+      ],
+      "id": "b7de6880-5810-4e5b-b330-b045bc31bf33",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Get many database pages').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "todo"
+            },
+            {
+              "key": "Feedback|rich_text",
+              "textContent": "={{ $('Set - Parse Message').item.json.feedback }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        -144
+      ],
+      "id": "6e597a9d-2684-4371-a594-e57de3163bf3",
+      "name": "Update a database page",
+      "credentials": {
+        "notionApi": {
+          "id": "kbC5xiCv8qkOKxeF",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Set - Parse Message').item.json.chatId }}",
+        "text": "=❌ Story {{ $('Set - Parse Message').item.json.storyId }} non trouvée",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "4e455771-1030-4283-bcc5-12d021cf87ec",
+      "name": "Send a text message",
+      "webhookId": "c8bd9093-2b83-450f-9473-ca5d786172c4",
+      "credentials": {
+        "telegramApi": {
+          "id": "bT73o9WOxsgD52BV",
+          "name": "Telegram app_decision_details"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "76142d3e-c259-411f-8512-342817c6369c",
+              "name": "storyId",
+              "value": "={{ $json.message.text.match(/^(US-\\d+)/i)[1].toUpperCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "27a9985f-26c5-4b8f-a798-4739f0f46fd8",
+              "name": "feedback",
+              "value": "={{ $json.message.text.replace(/^US-\\d+\\s*:\\s*/i, '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "30f3a981-ccd9-475b-ad5a-2b09b4891968",
+              "name": "chatId",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        -96
+      ],
+      "id": "02901137-50ca-41ba-b83d-937aac7749c4",
+      "name": "Set - Parse Message"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "⚠️ Format invalide. Utilisez: US-XXX: votre réponse",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        416,
+        96
+      ],
+      "id": "9a244923-400d-401b-b1a8-ec73fc91a0a2",
+      "name": "Send a text message1",
+      "webhookId": "6e6675e2-9ca0-4610-a729-5febe796fb26",
+      "credentials": {
+        "telegramApi": {
+          "id": "bT73o9WOxsgD52BV",
+          "name": "Telegram app_decision_details"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Set - Parse Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many database pages": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Update a database page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Parse Message": {
+      "main": [
+        [
+          {
+            "node": "Get many database pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "348389d4-c0f3-475e-b4ca-af997050fedd",
+  "activeVersionId": null,
+  "versionCounter": 8,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-01-11T15:39:03.113Z",
+      "createdAt": "2026-01-11T15:39:03.113Z",
+      "role": "workflow:owner",
+      "workflowId": "EB1AbwXWSskfEq9ymt62R",
+      "projectId": "sNNrSsaIZrZEIzbV",
+      "project": {
+        "updatedAt": "2025-08-17T10:23:29.036Z",
+        "createdAt": "2025-08-17T10:13:04.274Z",
+        "id": "sNNrSsaIZrZEIzbV",
+        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

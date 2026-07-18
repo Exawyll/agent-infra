@@ -34,14 +34,14 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://100.106.174.46:8644/webhooks/newsletter-gaming",
+        "url": "={{ $env.HERMES_GATEWAY_URL }}/webhooks/newsletter-gaming",
         "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "X-Hub-Signature-256",
-              "value": "sha256=e4667738708d04e8bc0fe88f03b58ae992a38cb2c744b2c02070ab85d925e312"
+              "value": "={{ $env.HERMES_WEBHOOK_SIGNATURE }}"
             },
             {
               "name": "Content-Type",
@@ -83,9 +83,18 @@
                 "type": "number",
                 "operation": "largerEqual"
               }
+            },
+            {
+              "id": "status-undefined",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isEmpty"
+              }
             }
           ],
-          "combinator": "and"
+          "combinator": "or"
         },
         "looseTypeValidation": true,
         "options": {}
@@ -205,14 +214,14 @@
         ],
         "parameters": {
           "method": "POST",
-          "url": "http://100.106.174.46:8644/webhooks/newsletter-gaming",
+          "url": "={{ $env.HERMES_GATEWAY_URL }}/webhooks/newsletter-gaming",
           "authentication": "none",
           "sendHeaders": true,
           "headerParameters": {
             "parameters": [
               {
                 "name": "X-Hub-Signature-256",
-                "value": "sha256=e4667738708d04e8bc0fe88f03b58ae992a38cb2c744b2c02070ab85d925e312"
+                "value": "={{ $env.HERMES_WEBHOOK_SIGNATURE }}"
               },
               {
                 "name": "Content-Type",
@@ -254,9 +263,18 @@
                   "type": "number",
                   "operation": "largerEqual"
                 }
+              },
+              {
+                "id": "status-undefined",
+                "leftValue": "={{ $json.statusCode }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "isEmpty"
+                }
               }
             ],
-            "combinator": "and"
+            "combinator": "or"
           },
           "looseTypeValidation": true,
           "options": {}

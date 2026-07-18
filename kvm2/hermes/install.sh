@@ -29,25 +29,6 @@ install_hermes_binary() {
   echo "✅ Hermes installed: $(hermes --version | head -1)"
 }
 
-install_systemd() {
-  echo "🔧 Installing Hermes systemd service..."
-  local unit_src="${SCRIPT_DIR}/hermes.service"
-  local unit_dst="/etc/systemd/system/hermes.service"
-
-  if [ ! -f "$unit_src" ]; then
-    echo "❌ Unit file not found: $unit_src"
-    exit 1
-  fi
-
-  cp "$unit_src" "$unit_dst"
-  chmod 644 "$unit_dst"
-  systemctl daemon-reload
-  systemctl enable hermes.service
-  systemctl start hermes.service
-  echo "✅ Hermes systemd service installed and started"
-  systemctl status hermes.service --no-pager | head -5
-}
-
 install_gitleaks() {
   if ! command -v gitleaks &>/dev/null; then
     echo "🔐 Installing gitleaks..."
@@ -87,24 +68,30 @@ install_sops_age() {
 
 case "${1:-all}" in
   hermes)    install_hermes_binary ;;
-  systemd)   install_systemd ;;
+  systemd)
+    echo "⚠️  'systemd' n'installe plus rien : le service global hermes.service"
+    echo "   (ancienne syntaxe CLI, obsolète) a été retiré. Chaque profil est"
+    echo "   servi par son propre service systemd user-level, installé par"
+    echo "   ./scripts/deploy.sh hermes (hermes --profile <nom> gateway install)."
+    ;;
   gitleaks)  install_gitleaks ;;
   sops)      install_sops_age ;;
-  deps)      install_gitleaks; install_sops_age ;;
+  deps)      install_gitleaks; install_sops_age; install_hermes_binary ;;
   all)
     install_gitleaks
     install_sops_age
     install_hermes_binary
-    install_systemd
     echo ""
     echo "🎉 Installation terminée. Vérifie :"
-    echo "   systemctl status hermes"
     echo "   hermes --version"
     echo "   gitleaks version"
     echo "   age --version"
+    echo ""
+    echo "   Les services gateway par profil sont installés par :"
+    echo "   ./scripts/deploy.sh hermes"
     ;;
   *)
-    echo "Usage: $0 [hermes|systemd|gitleaks|sops|deps|all]"
+    echo "Usage: $0 [hermes|gitleaks|sops|deps|all]"
     exit 1
     ;;
 esac

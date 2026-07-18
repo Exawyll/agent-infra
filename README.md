@@ -101,9 +101,9 @@ agent-infra/
 │   │   └── litellm/             # LiteLLM routeur de modèles
 │   └── hermes/
 │       ├── config.yaml          # Config Hermes (versionnée)
-│       ├── hermes.service       # Systemd unit
 │       ├── install.sh           # Script d'installation reproductible
-│       └── profiles/
+│       └── profiles/            # Un service systemd user-level par profil
+│                                 # (hermes gateway install, via deploy.sh hermes)
 ├── kvm1/                        # VPS dev (mains)
 │   ├── docker/                  # Conteneurs éphémères
 │   └── agent-daemon/            # Scripts du daemon dev

@@ -172,10 +172,24 @@ with open('$dst_config', 'w') as f:
     echo "  📚 Veille skills deployed"
   fi
 
-  echo "🔧 Installing Hermes gateway service (veille)..."
+  echo "🔧 Installing Hermes gateway services (per profile, user-level systemd)..."
   # yes | : hermes gateway install prompts only for systemd confirmation.
-  # It has no destructive prompts. The --force flag handles reinstall.
-  yes | hermes --profile veille gateway install 2>&1 | tail -3
+  # It has no destructive prompts. --force handles reinstall on redeploy.
+  # User-level (not --system): matches how these units actually run on KVM2
+  # (~/.config/systemd/user/hermes-gateway-<profile>.service, root linger
+  # enabled so they survive reboot). The old global /etc/systemd/system/
+  # hermes.service (hermes.service in this repo, install.sh) used a CLI
+  # syntax ("hermes serve --gateway-only") that no longer exists in this
+  # Hermes version and crash-looped indefinitely — do not reintroduce it.
+  if [ -d "$repo_profiles" ]; then
+    for profile_dir in "$repo_profiles"/*/; do
+      local profile_name
+      profile_name=$(basename "$profile_dir")
+      [ ! -f "${profile_dir}config.yaml" ] && continue
+      echo "  🚀 ${profile_name}: gateway install"
+      yes | hermes --profile "$profile_name" gateway install --force 2>&1 | tail -3
+    done
+  fi
   echo "✅ Hermes deployed"
 
   # Cleanup .env immediately — hermes is the last consumer in a chain.

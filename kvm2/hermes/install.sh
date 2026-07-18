@@ -3,28 +3,32 @@
 # Usage: ./install.sh [hermes|systemd|all]
 set -euo pipefail
 
-HERMES_VERSION="${HERMES_VERSION:-0.17.0}"
 HERMES_HOME="${HERMES_HOME:-/root/.hermes}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 install_hermes_binary() {
-  echo "📦 Installing Hermes Agent v${HERMES_VERSION}..."
+  echo "📦 Installing Hermes Agent..."
 
   if command -v hermes &>/dev/null; then
     local current
     current=$(hermes --version 2>/dev/null | head -1 || echo "unknown")
     echo "  Hermes already installed: ${current}"
-    echo "  To upgrade, uninstall first: pip uninstall -y hermes-agent"
+    echo "  To upgrade: hermes update"
     return
   fi
 
-  # Hermes is installed via pip
-  pip install hermes-agent=="${HERMES_VERSION}" --quiet 2>&1 || {
-    echo "  ⚠️  pip install failed — trying direct binary download..."
-    local url="https://github.com/NousResearch/hermes-agent/releases/download/v${HERMES_VERSION}/hermes-agent-${HERMES_VERSION}-linux-x86_64.tar.gz"
-    curl -sSfL "$url" | tar xz -C /usr/local/bin/ hermes
-    chmod +x /usr/local/bin/hermes
-  }
+  # Official installer (uv + venv at /usr/local/lib/hermes-agent, matches
+  # what's actually running on KVM2). "pip install hermes-agent==X" is NOT
+  # a valid install path — pip isn't even present by default on a fresh
+  # Ubuntu 24.04 box, and there's no matching GitHub release tarball either;
+  # both were confirmed broken on a from-scratch KVM1 test.
+  #
+  # No version pin available: the installer always tracks the `main`
+  # branch (only `--branch NAME` is exposed, default main), so a fresh
+  # install gets whatever is newest upstream, which may differ from
+  # whatever version is currently running on KVM2. Re-verify functionally
+  # after any restore.sh run rather than assuming version parity.
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 
   echo "✅ Hermes installed: $(hermes --version | head -1)"
 }

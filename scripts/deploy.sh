@@ -173,21 +173,26 @@ with open('$dst_config', 'w') as f:
   fi
 
   echo "🔧 Installing Hermes gateway services (per profile, user-level systemd)..."
-  # yes | : hermes gateway install prompts only for systemd confirmation.
-  # It has no destructive prompts. --force handles reinstall on redeploy.
-  # User-level (not --system): matches how these units actually run on KVM2
-  # (~/.config/systemd/user/hermes-gateway-<profile>.service, root linger
-  # enabled so they survive reboot). The old global /etc/systemd/system/
-  # hermes.service (hermes.service in this repo, install.sh) used a CLI
-  # syntax ("hermes serve --gateway-only") that no longer exists in this
-  # Hermes version and crash-looped indefinitely — do not reintroduce it.
+  # --force skips the confirmation prompt on its own when stdin isn't a TTY
+  # (< /dev/null) — no destructive prompts either way. Do NOT pipe `yes`
+  # into this: with `set -o pipefail`, `yes` gets SIGPIPE'd (exit 141) the
+  # moment `hermes` exits and closes its stdin, which fails the whole
+  # pipeline and aborts the script even though the install itself
+  # succeeded (confirmed live: it silently killed this loop after the
+  # first profile). User-level (not --system): matches how these units
+  # actually run on KVM2 (~/.config/systemd/user/hermes-gateway-<profile>.
+  # service, root linger enabled so they survive reboot). The old global
+  # /etc/systemd/system/hermes.service (hermes.service in this repo,
+  # install.sh) used a CLI syntax ("hermes serve --gateway-only") that no
+  # longer exists in this Hermes version and crash-looped indefinitely —
+  # do not reintroduce it.
   if [ -d "$repo_profiles" ]; then
     for profile_dir in "$repo_profiles"/*/; do
       local profile_name
       profile_name=$(basename "$profile_dir")
       [ ! -f "${profile_dir}config.yaml" ] && continue
       echo "  🚀 ${profile_name}: gateway install"
-      yes | hermes --profile "$profile_name" gateway install --force 2>&1 | tail -3
+      hermes --profile "$profile_name" gateway install --force < /dev/null 2>&1 | tail -3
     done
   fi
   echo "✅ Hermes deployed"

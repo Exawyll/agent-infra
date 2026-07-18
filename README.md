@@ -130,7 +130,7 @@ agent-infra/
 | n8n | `2.30.5` |
 | Traefik | `v3.3` |
 | LiteLLM | `main-v1.55.0` |
-| Hermes | `0.17.0` |
+| Hermes | non figée — l'installeur officiel suit toujours `main`, pas de pin de version disponible. Vérifier `hermes --version` après tout `restore.sh` plutôt que de supposer une parité avec le KVM2 actuel. |
 | sops | `3.9.4` |
 | age | `1.2.1` |
 | gitleaks | `8.23.3` |

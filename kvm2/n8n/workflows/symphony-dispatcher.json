@@ -1,0 +1,240 @@
+{
+  "id": "symphonyDispatcher01",
+  "name": "symphony-dispatcher",
+  "description": "Phase 2 Symphony : cron 5min, garantit qu'un ticket Linear éligible (repo:agent-infra) a un run agent en cours. NON VÉRIFIÉ contre l'instance n8n / le board Linear réels — schéma GraphQL Linear et typeVersion des nodes à reconcilier avant premier import, cf. feedback-n8n-deploy-gotchas.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "schedule-1",
+      "name": "Cron 5min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "minutes", "minutesInterval": 5 }
+          ]
+        }
+      }
+    },
+    {
+      "id": "code-config-1",
+      "name": "Config repo cible",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "parameters": {
+        "jsCode": "// Un seul point de vérité pour le repo cible — c'est ce node qui rend `repo`\n// extensible sans retoucher la structure du workflow (cf. plan Symphony Phase 2).\n// MVP : une seule entrée. Ajouter une ligne ici (et une valeur de label Linear\n// correspondante, ex. repo:autre-app) suffira pour un futur repo additionnel.\nconst REPO_MAP = {\n  'agent-infra': { owner: 'Exawyll', repo: 'agent-infra', workflowFile: 'symphony-run-dev.yml' }\n};\n\nreturn [{ json: { repoMap: REPO_MAP, targetRepoLabel: 'repo:agent-infra' } }];"
+      }
+    },
+    {
+      "id": "http-query-ready-1",
+      "name": "Linear: query Ready + agent:ok",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { issues(filter: { labels: { name: { eq: \\\"${$env.LINEAR_LABEL_AGENT_OK || 'agent:ok'}\\\" } }, state: { name: { eq: \\\"${$env.LINEAR_STATE_READY || 'Ready'}\\\" } } }, first: 50, orderBy: createdAt) { nodes { id identifier title description createdAt state { id name } labels { nodes { name } } } } }` }) }}"
+      }
+    },
+    {
+      "id": "http-query-inprogress-1",
+      "name": "Linear: query In Progress (repo)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { issues(filter: { labels: { name: { eq: \\\"repo:agent-infra\\\" } }, state: { name: { eq: \\\"${$env.LINEAR_STATE_IN_PROGRESS || 'In Progress'}\\\" } } }, first: 5) { nodes { id identifier } } }` }) }}"
+      }
+    },
+    {
+      "id": "code-eligibility-1",
+      "name": "Filtrer éligibilité (4 critères)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0],
+      "parameters": {
+        "jsCode": "// Les 4 critères d'éligibilité SPEC.md : label agent:ok (déjà filtré côté GraphQL),\n// type renseigné, repo sans ambiguïté, critères d'acceptation non vides.\n// Un ticket qui échoue est ignoré silencieusement (pas une erreur, cf. plan Phase 2).\nconst TYPE_LABELS = (($env.LINEAR_TYPE_LABELS) || 'Bug,Feature,Improvement,Docs').split(',').map(s => s.trim());\n\nconst resp = $input.first().json;\nconst issues = (resp.data && resp.data.issues && resp.data.issues.nodes) || [];\n\nconst eligible = issues\n  .map((issue) => {\n    const labelNames = (issue.labels && issue.labels.nodes || []).map((l) => l.name);\n    const repoLabel = labelNames.find((n) => n.startsWith('repo:'));\n    const hasType = labelNames.some((n) => TYPE_LABELS.includes(n));\n    const hasCriteria = !!(issue.description && issue.description.trim().length > 0);\n    const repoOk = repoLabel === 'repo:agent-infra'; // MVP : une seule valeur valide\n    return {\n      ...issue,\n      _eligible: hasType && hasCriteria && repoOk,\n      _repo: repoLabel ? repoLabel.slice('repo:'.length) : null\n    };\n  })\n  .filter((i) => i._eligible)\n  .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));\n\nreturn eligible.map((issue) => ({ json: issue }));"
+      }
+    },
+    {
+      "id": "code-gate-1",
+      "name": "Concurrence: 1 run/repo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 110],
+      "parameters": {
+        "jsCode": "// Fusionne le résultat des deux requêtes précédentes (In Progress + éligibles)\n// et n'autorise le passage que si aucun ticket repo:agent-infra n'est déjà In Progress.\nconst inProgressResp = $('Linear: query In Progress (repo)').first().json;\nconst inProgressCount = (inProgressResp.data && inProgressResp.data.issues && inProgressResp.data.issues.nodes || []).length;\n\nconst eligible = $input.all().map((i) => i.json);\n\nif (inProgressCount > 0 || eligible.length === 0) {\n  return []; // rien à faire ce tour-ci\n}\n\n// Le plus ancien ticket éligible uniquement — un seul run à la fois.\nreturn [{ json: eligible[0] }];"
+      }
+    },
+    {
+      "id": "http-resolve-states-1",
+      "name": "Linear: resolve states + labels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 110],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { team(id: \\\"${$env.LINEAR_TEAM_ID}\\\") { states { nodes { id name } } labels { nodes { id name } } } }` }) }}"
+      }
+    },
+    {
+      "id": "code-transition-payload-1",
+      "name": "Construire mutation In Progress",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 110],
+      "parameters": {
+        "jsCode": "// Jamais d'ID Linear (state ou label) en dur dans ce repo — résolus par nom à\n// chaque run via l'API, pour absorber le mapping réel du board (cf. Prérequis\n// #1 du plan Symphony Phase 2 : les states réels peuvent ne pas s'appeler\n// littéralement \"Ready\"/\"In Progress\").\nconst ticket = $('Concurrence: 1 run/repo').first().json;\nconst resolved = $input.first().json;\nconst states = (resolved.data && resolved.data.team && resolved.data.team.states.nodes) || [];\nconst labels = (resolved.data && resolved.data.team && resolved.data.team.labels.nodes) || [];\n\nconst wantedState = $env.LINEAR_STATE_IN_PROGRESS || 'In Progress';\nconst targetState = states.find((s) => s.name === wantedState);\nif (!targetState) {\n  throw new Error(`State \"${wantedState}\" introuvable sur l'équipe Linear — vérifier LINEAR_STATE_IN_PROGRESS / le board réel.`);\n}\n\nconst attemptLabel = labels.find((l) => l.name === 'attempt:1');\nif (!attemptLabel) {\n  throw new Error('Label \"attempt:1\" introuvable — le créer sur le board Linear (cf. Prérequis Phase 2) avant le premier run.');\n}\n\nreturn [{ json: { ticket, targetStateId: targetState.id, attemptLabelId: attemptLabel.id } }];"
+      }
+    },
+    {
+      "id": "http-claim-1",
+      "name": "Linear: transition -> In Progress",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 110],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { issueUpdate(id: \\\"${$json.ticket.id}\\\", input: { stateId: \\\"${$json.targetStateId}\\\" }) { success } }` }) }}"
+      }
+    },
+    {
+      "id": "code-attempt-payload-1",
+      "name": "Préparer label attempt:1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 110],
+      "parameters": {
+        "jsCode": "// Pas de staticData n8n ici : un workflow n'a pas accès au staticData d'un autre\n// (dispatcher/watchdog/merge-handler sont 3 workflows distincts). L'état partagé\n// entre-eux vit donc dans Linear lui-même : `startedAt` est déjà natif sur l'API\n// Linear (rempli automatiquement à l'entrée dans un state de type \"started\"),\n// et le compteur de tentative/rejet est porté par des labels `attempt:N` /\n// `rejected:N` — visibles dans l'UI Linear, lisibles par n'importe quel workflow.\nconst prev = $('Construire mutation In Progress').first().json;\nreturn [{ json: { ticket: prev.ticket, attempt: 1, attemptLabelId: prev.attemptLabelId } }];"
+      }
+    },
+    {
+      "id": "http-label-attempt-1",
+      "name": "Linear: poser label attempt:1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 110],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { issueAddLabel(id: \\\"${$json.ticket.id}\\\", labelId: \\\"${$json.attemptLabelId}\\\") { success } }` }) }}"
+      }
+    },
+    {
+      "id": "http-dispatch-1",
+      "name": "GitHub: workflow_dispatch run-dev",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 110],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.github.com/repos/' + $('Config repo cible').first().json.repoMap['agent-infra'].owner + '/' + $('Config repo cible').first().json.repoMap['agent-infra'].repo + '/actions/workflows/' + $('Config repo cible').first().json.repoMap['agent-infra'].workflowFile + '/dispatches' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github+json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ref: 'main', inputs: { ticket_id: $('Préparer label attempt:1').first().json.ticket.id, ticket_identifier: $('Préparer label attempt:1').first().json.ticket.identifier, title: $('Préparer label attempt:1').first().json.ticket.title, acceptance_criteria: $('Préparer label attempt:1').first().json.ticket.description, repo: 'Exawyll/agent-infra', attempt: String($('Préparer label attempt:1').first().json.attempt) } }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Cron 5min": {
+      "main": [[
+        { "node": "Config repo cible", "type": "main", "index": 0 },
+        { "node": "Linear: query Ready + agent:ok", "type": "main", "index": 0 },
+        { "node": "Linear: query In Progress (repo)", "type": "main", "index": 0 }
+      ]]
+    },
+    "Linear: query Ready + agent:ok": {
+      "main": [[ { "node": "Filtrer éligibilité (4 critères)", "type": "main", "index": 0 } ]]
+    },
+    "Filtrer éligibilité (4 critères)": {
+      "main": [[ { "node": "Concurrence: 1 run/repo", "type": "main", "index": 0 } ]]
+    },
+    "Concurrence: 1 run/repo": {
+      "main": [[ { "node": "Linear: resolve states + labels", "type": "main", "index": 0 } ]]
+    },
+    "Linear: resolve states + labels": {
+      "main": [[ { "node": "Construire mutation In Progress", "type": "main", "index": 0 } ]]
+    },
+    "Construire mutation In Progress": {
+      "main": [[ { "node": "Linear: transition -> In Progress", "type": "main", "index": 0 } ]]
+    },
+    "Linear: transition -> In Progress": {
+      "main": [[ { "node": "Préparer label attempt:1", "type": "main", "index": 0 } ]]
+    },
+    "Préparer label attempt:1": {
+      "main": [[ { "node": "Linear: poser label attempt:1", "type": "main", "index": 0 } ]]
+    },
+    "Linear: poser label attempt:1": {
+      "main": [[ { "node": "GitHub: workflow_dispatch run-dev", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "tags": []
+}

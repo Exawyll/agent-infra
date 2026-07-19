@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks (pinned, cf. README "Versions figées")
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.23.3/gitleaks_8.23.3_linux_x64.tar.gz \
+            | tar xz -C /usr/local/bin/ gitleaks
+      - name: Scan PR diff
+        run: |
+          gitleaks detect \
+            --source . \
+            --config .gitleaks.toml \
+            --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" \
+            --redact \
+            --verbose
+
+  validate-json:
+    name: validate n8n workflow JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: jq empty on every workflow export
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          files=(n8n-workflows/**/*.json kvm2/n8n/workflows/**/*.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No workflow JSON files found — nothing to validate."
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            echo "Checking $f"
+            jq empty "$f"
+          done
+
+  shellcheck:
+    name: shellcheck scripts/*.sh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: "./scripts"

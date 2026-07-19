@@ -28,6 +28,11 @@ services:
     restart: always
     ports:
       - "127.0.0.1:4000:4000"
+      # IP Tailscale de KVM2 (même IP que le profil Hermes `veille`) — jamais 0.0.0.0.
+      # Permet aux runners CI GitHub Actions (nœuds éphémères tag:ci) d'atteindre LiteLLM
+      # sans exposition publique. Restriction réseau réelle appliquée côté ACL Tailscale,
+      # voir kvm2/tailscale/acl-tag-ci.md.
+      - "100.106.174.46:4000:4000"
     environment:
       - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD}@litellm-postgres:5432/litellm
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}

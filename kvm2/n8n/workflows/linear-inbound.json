@@ -62,13 +62,13 @@
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
-        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID_DEV }}",
         "text": "=🎫 *Ticket Linear* — {{ $json.action }}\n\n*{{ $json.identifier }}* — {{ $json.title }}\nÉtat : {{ $json.state }}\nLabels : {{ $json.labels.length ? $json.labels.join(', ') : 'aucun' }}\n{{ $json.url }}"
       },
       "credentials": {
         "telegramApi": {
-          "id": "ihZuIM3ZQcKsWsu9",
-          "name": "Telegram account"
+          "id": "wlQCREwal47a8XDG",
+          "name": "Telegram agent-dev"
         }
       }
     }

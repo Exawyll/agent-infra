@@ -61,7 +61,7 @@
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
-        "chatId": "8262789577",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
         "text": "=🎫 *Ticket Linear* — {{ $json.action }}\n\n*{{ $json.identifier }}* — {{ $json.title }}\nÉtat : {{ $json.state }}\nLabels : {{ $json.labels.length ? $json.labels.join(', ') : 'aucun' }}\n{{ $json.url }}"
       },
       "credentials": {

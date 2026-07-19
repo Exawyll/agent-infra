@@ -1,0 +1,118 @@
+{
+  "name": "linear-inbound",
+  "description": "Phase 1 Symphony : webhook Linear (signature vérifiée) → résumé posté sur Telegram",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "webhook-linear-1",
+      "name": "Webhook Linear",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "linear-inbound",
+        "authentication": "none",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "webhookId": "linear-inbound"
+    },
+    {
+      "id": "code-verify-signature-1",
+      "name": "Vérifier signature HMAC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Vérifie la signature Linear (HMAC-SHA256 sur le corps brut de la requête,\n// header `Linear-Signature`) avant de faire confiance au payload.\n// Nécessite que l'option \"Raw Body\" soit activée sur le node Webhook en amont\n// (sinon le corps re-sérialisé par n8n ne correspond plus, octet pour octet,\n// à ce que Linear a signé).\n\nconst crypto = require('crypto');\n\nconst secret = $env.LINEAR_WEBHOOK_SECRET;\nif (!secret) {\n  throw new Error('LINEAR_WEBHOOK_SECRET manquant dans l\\'environnement n8n');\n}\n\nconst item = $input.first();\nconst rawBodyBase64 = item.binary && item.binary.data && item.binary.data.data;\nif (!rawBodyBase64) {\n  throw new Error('Corps brut introuvable — vérifie que \"Raw Body\" est activé sur le node Webhook Linear');\n}\n\nconst rawBody = Buffer.from(rawBodyBase64, 'base64');\nconst signatureHeader = ((item.json.headers && item.json.headers['linear-signature']) || '').toString();\n\nconst expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');\n\nconst expectedBuf = Buffer.from(expected, 'utf8');\nconst receivedBuf = Buffer.from(signatureHeader, 'utf8');\nconst valid = expectedBuf.length === receivedBuf.length && crypto.timingSafeEqual(expectedBuf, receivedBuf);\n\nif (!valid) {\n  throw new Error('Signature Linear invalide — requête rejetée');\n}\n\nconst payload = JSON.parse(rawBody.toString('utf8'));\n\nreturn [{ json: payload }];"
+      }
+    },
+    {
+      "id": "code-extract-ticket-1",
+      "name": "Extraire ticket",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Normalise le payload Linear (id, titre, état, labels) pour le résumé Telegram.\nconst body = $input.first().json;\nconst data = body.data || {};\n\nconst labelList = Array.isArray(data.labels)\n  ? data.labels\n  : (data.labels && data.labels.nodes) || [];\nconst labels = labelList.map((l) => (l && l.name) ? l.name : l);\n\nreturn [{\n  json: {\n    action: body.action,\n    id: data.id,\n    identifier: data.identifier || data.id,\n    title: data.title,\n    state: (data.state && data.state.name) || 'inconnu',\n    labels,\n    url: data.url || ''\n  }\n}];"
+      }
+    },
+    {
+      "id": "tg-summary-1",
+      "name": "Résumé Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 2,
+      "position": [
+        900,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "8262789577",
+        "text": "=🎫 *Ticket Linear* — {{ $json.action }}\n\n*{{ $json.identifier }}* — {{ $json.title }}\nÉtat : {{ $json.state }}\nLabels : {{ $json.labels.length ? $json.labels.join(', ') : 'aucun' }}\n{{ $json.url }}"
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "ihZuIM3ZQcKsWsu9",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Linear": {
+      "main": [
+        [
+          {
+            "node": "Vérifier signature HMAC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vérifier signature HMAC": {
+      "main": [
+        [
+          {
+            "node": "Extraire ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraire ticket": {
+      "main": [
+        [
+          {
+            "node": "Résumé Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "tags": []
+}

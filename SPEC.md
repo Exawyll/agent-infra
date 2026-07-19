@@ -28,6 +28,14 @@ Triage ──(agent:ok + critères)──▶ Ready ──(claim)──▶ In Pro
 - **Done** — PR mergée.
 - **Rejected** — PR fermée sans merge, ou run en échec après épuisement des essais.
 
+**Phase 2 (implémentation actuelle)** : le board Linear réel de l'équipe `agent-infra` n'a pas ces 6 states —
+seulement Backlog/Todo/In Progress/Done/Duplicate/Canceled (vérifié via l'API le 2026-07-19). Décision : pas de
+nouveaux states créés, remapping direct — Backlog=Triage, Todo=Ready, In Progress et Done inchangés (déjà
+natifs). Pas d'équivalent "In Review" : un ticket reste In Progress jusqu'au merge de sa PR, transition directe
+vers Done à ce moment-là (`symphony-merge-handler`). "Rejected" du diagramme ci-dessus n'est jamais un état de
+repos — c'est la Ready ou la Triage de la règle ci-dessous, atteinte directement, sans étape intermédiaire.
+Config réelle : `LINEAR_STATE_*` dans `kvm2/docker/n8n/.env.template`.
+
 **Règle des rejets** : un ticket rejeté une 1ère fois peut repasser en Ready directement si la raison du rejet
 est mineure. Un ticket rejeté **2 fois consécutives** retourne obligatoirement en **Triage**, avec reformulation
 humaine obligatoire des critères d'acceptation avant de pouvoir redevenir Ready — jamais de 3e essai automatique

@@ -1,17 +1,17 @@
 # LiteLLM Proxy Config — Migration API DeepSeek directe
-# rapide → V4 Flash (DeepSeek direct)
+# rapide → GLM-5.2 (OpenRouter)
 # code   → V4 Pro (DeepSeek direct, fallback → rapide)
 # review → Kimi K3 (OpenRouter, ex-Claude Opus 4.8)
 # raisonnement → V4 Pro (DeepSeek direct)
 
 model_list:
-  # Rapide : tâches simples, veille — V4 Flash direct
+  # Rapide : tâches simples, veille — GLM-5.2 via OpenRouter
   - model_name: rapide
     litellm_params:
-      model: deepseek/deepseek-v4-flash
-      api_key: os.environ/DEEPSEEK_API_KEY
-      input_cost_per_token: 0.00000014
-      output_cost_per_token: 0.00000028
+      model: openrouter/z-ai/glm-5.2
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000025
+      output_cost_per_token: 0.00000079
 
   # Code : génération et debugging — V4 Pro direct
   - model_name: code

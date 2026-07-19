@@ -31,8 +31,11 @@ services:
       # IP Tailscale de KVM2 (même IP que le profil Hermes `veille`) — jamais 0.0.0.0.
       # Permet aux runners CI GitHub Actions (nœuds éphémères tag:ci) d'atteindre LiteLLM
       # sans exposition publique. Restriction réseau réelle appliquée côté ACL Tailscale,
-      # voir kvm2/tailscale/acl-tag-ci.md.
-      - "100.106.174.46:4000:4000"
+      # voir kvm2/tailscale/acl-tag-ci.md. IP en variable (pas en dur) : si KVM2 est
+      # réinstallé et change d'IP Tailscale, un seul endroit à corriger côté KVM2
+      # (le pendant GitHub Actions est la variable de repo LITELLM_TAILSCALE_URL,
+      # cf. SPEC.md "Secrets requis").
+      - "${TAILSCALE_KVM2_IP}:4000:4000"
     environment:
       - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD}@litellm-postgres:5432/litellm
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}

@@ -39,6 +39,11 @@ jobs:
       TICKET_ID: ${{ github.event.inputs.ticket_id }}
       TICKET_IDENTIFIER: ${{ github.event.inputs.ticket_identifier }}
       TICKET_TITLE: ${{ github.event.inputs.title }}
+      # Repository *variable* (Settings → Secrets and variables → Actions → Variables),
+      # pas un secret — c'est une IP Tailscale, pas une donnée sensible. À garder en
+      # phase avec TAILSCALE_KVM2_IP côté kvm2/docker/n8n/.env.template si KVM2 change
+      # d'IP Tailscale (cf. review PR #13). Valeur actuelle : http://100.106.174.46:4000
+      LITELLM_URL: ${{ vars.LITELLM_TAILSCALE_URL }}
       ACCEPTANCE_CRITERIA: ${{ github.event.inputs.acceptance_criteria }}
       ATTEMPT: ${{ github.event.inputs.attempt }}
       BRANCH_NAME: feat/${{ github.event.inputs.ticket_identifier }}-symphony-run
@@ -64,7 +69,7 @@ jobs:
 
       - name: Sanity check — LiteLLM reachable over tailnet
         run: |
-          curl -sf --max-time 10 http://100.106.174.46:4000/health \
+          curl -sf --max-time 10 "$LITELLM_URL/health" \
             || { echo "::error::LiteLLM unreachable over Tailscale — check ACL tag:ci (kvm2/tailscale/acl-tag-ci.md) before assuming an agent failure."; exit 1; }
 
       - name: Checkout or create ticket branch
@@ -83,7 +88,7 @@ jobs:
 
       - name: Run Claude Code (headless, routed through LiteLLM — never a direct Anthropic key)
         env:
-          ANTHROPIC_BASE_URL: http://100.106.174.46:4000
+          ANTHROPIC_BASE_URL: ${{ vars.LITELLM_TAILSCALE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.LITELLM_AGENT_DEV_KEY }}
         run: |
           cat > /tmp/prompt.md <<EOF

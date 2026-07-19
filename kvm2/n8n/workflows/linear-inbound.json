@@ -54,7 +54,7 @@
       "id": "tg-summary-1",
       "name": "Résumé Telegram",
       "type": "n8n-nodes-base.telegram",
-      "typeVersion": 2,
+      "typeVersion": 1.2,
       "position": [
         900,
         0

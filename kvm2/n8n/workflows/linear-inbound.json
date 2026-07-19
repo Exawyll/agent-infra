@@ -1,4 +1,5 @@
 {
+  "id": "kWUa9JHou6kq6nS8",
   "name": "linear-inbound",
   "description": "Phase 1 Symphony : webhook Linear (signature vérifiée) → résumé posté sur Telegram",
   "active": false,

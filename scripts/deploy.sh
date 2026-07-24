@@ -59,6 +59,113 @@ extract_secret() {
     || true
 }
 
+# ── Generate .env for a Hermes profile from SOPS secrets ──────────
+# Maps SOPS variable names → profile .env variable names.
+# Each profile gets at minimum the Telegram bootstrap vars (bot token,
+# home channel, allowed users). Additional vars are profile-specific.
+write_profile_env() {
+  local profile="$1"
+  local dst="${hermes_profiles}/${profile}/.env"
+  local tmp_env
+
+  # Build the .env atomically (write to temp, then rename)
+  tmp_env=$(mktemp)
+  chmod 600 "$tmp_env"
+
+  # ── 1. Telegram bootstrap vars (every profile) ────────────────
+  # SOPS profile var names are uppercase: ASSISTANT, DEV, VEILLE, PRO
+  local profile_upper
+  profile_upper=$(echo "$profile" | tr '[:lower:]' '[:upper:]')
+
+  # TELEGRAM_BOT_TOKEN → TELEGRAM_BOT_TOKEN_<PROFILE>
+  local bot_token
+  bot_token=$(extract_secret "TELEGRAM_BOT_TOKEN_${profile_upper}")
+  if [ -n "$bot_token" ]; then
+    echo "TELEGRAM_BOT_TOKEN=${bot_token}" >> "$tmp_env"
+  fi
+
+  # TELEGRAM_HOME_CHANNEL (single, shared across profiles)
+  local home_channel
+  home_channel=$(extract_secret "TELEGRAM_HOME_CHANNEL")
+  if [ -n "$home_channel" ]; then
+    echo "TELEGRAM_HOME_CHANNEL=${home_channel}" >> "$tmp_env"
+  fi
+
+  # TELEGRAM_ALLOWED_USERS → TELEGRAM_CHAT_ID_<PROFILE>
+  local chat_id
+  chat_id=$(extract_secret "TELEGRAM_CHAT_ID_${profile_upper}")
+  if [ -n "$chat_id" ]; then
+    echo "TELEGRAM_ALLOWED_USERS=${chat_id}" >> "$tmp_env"
+  fi
+
+  # ── 2. Profile-specific env vars ──────────────────────────────
+  case "$profile" in
+    dev)
+      local gh_token
+      gh_token=$(extract_secret "GITHUB_TOKEN")
+      [ -n "$gh_token" ] && echo "GITHUB_TOKEN=${gh_token}" >> "$tmp_env"
+
+      local notion_key
+      notion_key=$(extract_secret "NOTION_API_KEY")
+      [ -n "$notion_key" ] && echo "NOTION_API_KEY=${notion_key}" >> "$tmp_env"
+
+      local or_key
+      or_key=$(extract_secret "OPENROUTER_API_KEY")
+      [ -n "$or_key" ] && echo "OPENROUTER_API_KEY=${or_key}" >> "$tmp_env"
+
+      # All LiteLLM virtual keys (dev needs to orchestrate different profiles)
+      for lk in VEILLE DEV ASSISTANT PRO; do
+        local lk_val
+        lk_val=$(extract_secret "LITELLM_KEY_AGENT_${lk}")
+        [ -n "$lk_val" ] && echo "LITELLM_KEY_AGENT_${lk}=${lk_val}" >> "$tmp_env"
+      done
+      ;;
+    veille)
+      local lk_veille
+      lk_veille=$(extract_secret "LITELLM_KEY_AGENT_VEILLE")
+      [ -n "$lk_veille" ] && echo "LITELLM_API_KEY=${lk_veille}" >> "$tmp_env"
+
+      local litellm_url
+      litellm_url=$(extract_secret "LITELLM_BASE_URL")
+      [ -z "$litellm_url" ] && litellm_url="http://127.0.0.1:4000/v1"
+      echo "LITELLM_BASE_URL=${litellm_url}" >> "$tmp_env"
+      ;;
+    pro)
+      local or_key
+      or_key=$(extract_secret "OPENROUTER_API_KEY")
+      [ -n "$or_key" ] && echo "OPENROUTER_API_KEY=${or_key}" >> "$tmp_env"
+
+      local ds_key
+      ds_key=$(extract_secret "DEEPSEEK_API_KEY")
+      [ -n "$ds_key" ] && echo "DEEPSEEK_API_KEY=${ds_key}" >> "$tmp_env"
+
+      # All LiteLLM virtual keys
+      for lk in VEILLE DEV ASSISTANT PRO; do
+        local lk_val
+        lk_val=$(extract_secret "LITELLM_KEY_AGENT_${lk}")
+        [ -n "$lk_val" ] && echo "LITELLM_KEY_AGENT_${lk}=${lk_val}" >> "$tmp_env"
+      done
+
+      # Pro-specific env vars (Ediflux, PDP, etc.) — sourced from
+      # a dedicated SOPS file if it exists (secrets/pro-profile.env.enc.env)
+      local pro_sops="${SECRETS_DIR}/pro-profile.env.enc.env"
+      if [ -f "$pro_sops" ] && command -v sops &>/dev/null; then
+        sops --decrypt "$pro_sops" 2>/dev/null >> "$tmp_env"
+        echo "  🗂️  ${profile}/.env: pro-specific vars from SOPS" >&2
+      fi
+      ;;
+  esac
+
+  # Replace existing .env if we wrote something
+  if [ -s "$tmp_env" ]; then
+    mv "$tmp_env" "$dst"
+    echo "  📋 ${profile}/.env: generated from SOPS ($(wc -l < "$dst") vars)"
+  else
+    rm -f "$tmp_env"
+    echo "  ⚠️  ${profile}/.env: empty — no secrets extracted"
+  fi
+}
+
 # ── Components ─────────────────────────────────────────────────────
 
 deploy_n8n() {
@@ -173,19 +280,6 @@ with open('$dst_config', 'w') as f:
   fi
 
   echo "🔧 Installing Hermes gateway services (per profile, user-level systemd)..."
-  # --force skips the confirmation prompt on its own when stdin isn't a TTY
-  # (< /dev/null) — no destructive prompts either way. Do NOT pipe `yes`
-  # into this: with `set -o pipefail`, `yes` gets SIGPIPE'd (exit 141) the
-  # moment `hermes` exits and closes its stdin, which fails the whole
-  # pipeline and aborts the script even though the install itself
-  # succeeded (confirmed live: it silently killed this loop after the
-  # first profile). User-level (not --system): matches how these units
-  # actually run on KVM2 (~/.config/systemd/user/hermes-gateway-<profile>.
-  # service, root linger enabled so they survive reboot). The old global
-  # /etc/systemd/system/hermes.service (hermes.service in this repo,
-  # install.sh) used a CLI syntax ("hermes serve --gateway-only") that no
-  # longer exists in this Hermes version and crash-looped indefinitely —
-  # do not reintroduce it.
   if [ -d "$repo_profiles" ]; then
     for profile_dir in "$repo_profiles"/*/; do
       local profile_name
@@ -195,11 +289,20 @@ with open('$dst_config', 'w') as f:
       hermes --profile "$profile_name" gateway install --force < /dev/null 2>&1 | tail -3
     done
   fi
+
+  # ── 3. Generate .env for each profile from SOPS secrets ────────
+  echo "📬 Generating profile .env files from SOPS secrets..."
+  echo "   (TELEGRAM_HOME_CHANNEL, TELEGRAM_BOT_TOKEN, ALLOWED_USERS, etc.)"
+  for profile_dir in "$repo_profiles"/*/; do
+    local profile_name
+    profile_name=$(basename "$profile_dir")
+    [ ! -f "${profile_dir}config.yaml" ] && continue
+    write_profile_env "$profile_name"
+  done
+
   echo "✅ Hermes deployed"
 
   # Cleanup .env immediately — hermes is the last consumer in a chain.
-  # n8n already consumed it via docker compose --env-file (decoupled from
-  # the file handle after docker-compose returns).
   if [ "${_ENV_CREATED:-false}" = "true" ] && [ -f "${_ENV_FILE}" ]; then
     cleanup
     _ENV_CREATED=false   # EXIT trap already ran, don't double-fire

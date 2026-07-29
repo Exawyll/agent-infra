@@ -1,0 +1,434 @@
+{
+  "name": "Veille IA - Digest v3",
+  "description": null,
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "name": "Schedule 7h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "af34fbe9-30e4-41b1-87df-d4b5fbbac2bc"
+    },
+    {
+      "parameters": {
+        "url": "http://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.CL&sortBy=submittedDate&sortOrder=descending&max_results=15",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "ArXiv",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        304,
+        -208
+      ],
+      "id": "3482b884-e7d4-4d53-b1a1-6754f59ec0c0",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://huggingface.co/api/daily_papers?limit=10",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "HuggingFace",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        304,
+        0
+      ],
+      "id": "4b18bf0e-6945-448b-9c8e-3cf3cd4dfdba",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "sonar-pro",
+        "messages": {
+          "message": [
+            {
+              "content": "Tu es un assistant de veille IA. Pour chaque actualité, retourne UNE ligne au format exact : [SOURCE] Titre. Résumé en une phrase. URL\nExemple : [TechCrunch] OpenAI lance GPT-5. Nouveau modèle avec capacités multimodales améliorées et meilleur raisonnement. https://techcrunch.com/...\nRetourne environ 5 à 8 actualités. IMPORTANT : chaque item sur UNE SEULE ligne avec un URL valide à la fin.",
+              "role": "system"
+            },
+            {
+              "content": "Quelles sont les actualités IA importantes des dernières 24h ? (nouveaux modèles, annonces business, régulations, avancées recherche)"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxTokens": 3000,
+          "temperature": 0.2,
+          "searchRecency": "day"
+        },
+        "requestOptions": {}
+      },
+      "name": "Perplexity News",
+      "type": "n8n-nodes-base.perplexity",
+      "typeVersion": 2,
+      "position": [
+        304,
+        208
+      ],
+      "id": "0d2ec1eb-9149-449f-95f5-e09466ec09a3",
+      "credentials": {
+        "perplexityApi": {
+          "id": "x2UHVarhFmXcYV5N",
+          "name": "Perplexity account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "sonar-pro",
+        "messages": {
+          "message": [
+            {
+              "content": "Tu es un assistant de veille outils IA. Pour chaque outil/framework/modèle, retourne UNE ligne au format exact : [SOURCE] Nom outil. Description courte. URL\nExemple : [GitHub] agent-sdk v2.0. Nouveau SDK pour agents autonomes avec support multi-modèles et outils intégrés. https://github.com/...\nRetourne environ 5 à 8 outils. IMPORTANT : chaque item sur UNE SEULE ligne avec un URL valide à la fin.",
+              "role": "system"
+            },
+            {
+              "content": "Quels sont les nouveaux outils, frameworks open source, modèles ou bibliothèques IA publiés dans les dernières 24h ?"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxTokens": 3000,
+          "temperature": 0.2,
+          "searchRecency": "day"
+        },
+        "requestOptions": {}
+      },
+      "name": "Perplexity Tools",
+      "type": "n8n-nodes-base.perplexity",
+      "typeVersion": 2,
+      "position": [
+        304,
+        400
+      ],
+      "id": "b9cb67cc-fac3-4e51-9b94-33f9214e7915",
+      "credentials": {
+        "perplexityApi": {
+          "id": "x2UHVarhFmXcYV5N",
+          "name": "Perplexity account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Veille IA - Normalisation multi-sources vers prompt LLM\nvar items = $input.all();\nvar articles = [];\n\n// Lire les URLs deja envoyees (injectees par notion-dedup.js)\nvar seenUrls = {};\nitems.forEach(function(it) {\n  if (it.json && Array.isArray(it.json._seenUrls)) {\n    it.json._seenUrls.forEach(function(url) { seenUrls[url] = true; });\n  }\n});\n\n// Domaines hors-sujet IT\nvar OFFTOPIC = /molecular biology|thermodynamic equilibrium|political elite|electoral|gerontolog|cognitive impairment|earth observation|epidemi|genomic|drug discovery|medical imaging|ecology\\b|climate forecast|seismic|particle physics/i;\n\nfunction clean(s) {\n  return (s || '')\n    .replace(/\\\\textbf\\{([^}]*)\\}/g, '$1')\n    .replace(/\\\\emph\\{([^}]*)\\}/g, '$1')\n    .replace(/\\\\[a-z]+\\{[^}]*\\}/g, '')\n    .replace(/\\$[^$\\n]+\\$/g, '')\n    .replace(/\\*\\*/g, '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction truncate(s, maxLen) {\n  if (!s || s.length <= maxLen) return s;\n  var cut = s.lastIndexOf(' ', maxLen);\n  return (cut > maxLen * 0.6 ? s.substring(0, cut) : s.substring(0, maxLen)) + '\\u2026';\n}\n\nfunction isSpecificUrl(url) {\n  if (!url) return false;\n  if (/instagram\\.com\\/[^/]+\\/?(\\?|$)/.test(url)) return false;\n  if (/youtube\\.com\\/(channel|c\\/|user\\/|@)/.test(url)) return false;\n  if (/\\/(support|fr\\/support|outils-ia)\\/?(\\?|$)/.test(url)) return false;\n  var m = url.match(/^https?:\\/\\/[^/?#]+(\\/[^?#]*)/);\n  var path = m ? m[1].replace(/\\/$/, '') : '';\n  return path.length > 0;\n}\n\nfunction categorize(title, summary, type) {\n  var text = (title + ' ' + (summary || '')).toLowerCase();\n  if (type !== 'news') {\n    if (/speculative decod|kv cache|inference speed|token.*per.*second|throughput|latency.*llm|llm.*latency/.test(text)) return 'LLM performance';\n    if (/\\bagent\\b|agentic|gui agent|task planning|multi-agent|autonomous.*action/.test(text)) return 'agents IA';\n    if (/reward model|rlhf|reinforcement learning|post.train|fine.tun|grpo|ppo\\b/.test(text)) return 'RL et entrainement';\n    if (/text-to-image|image generat|diffusion model|image synthes|visual generat/.test(text)) return 'vision IA';\n    if (/hallucin|jailbreak|adversarial|safety align|value align|red.team/.test(text)) return 'fiabilite IA';\n    if (/benchmark|leaderboard|evaluat.*llm|llm.*evaluat|dataset.*train/.test(text)) return 'benchmark';\n    if (/multilingual|translation|reasoning|code generat|coding llm/.test(text)) return 'NLP et raisonnement';\n    return 'recherche';\n  }\n  if (/nouveau modele|new model|deploiement.*modele|modele.*pointe|version \\d|release.*model|model.*release/.test(text)) return 'nouveau modele';\n  if (/arnaque|phishing|deepfake|cyberattaque|fraud|scam|malveillance|clonage de voix|usurpation/.test(text)) return 'cybersecurite';\n  if (/\\d+\\s*%|millions? (d.utilisateurs|users)|adoption|sondage|etude|rapport.*ia|ia.*rapport|impact.*societe/.test(text)) return 'societe';\n  if (/computer.use|nouvelle.*(fonctionnalite|capacite|integration)|connecteur|mise a jour.*ia|ia.*mise a jour/.test(text)) return 'feature produit';\n  if (/\\boutil\\b|outil ia|ai tool|assistant ia|application ia|lancement.*app/.test(text)) return 'outil';\n  return 'actualite IA';\n}\n\n// 1. HuggingFace Daily Papers\nitems.forEach(function(it) {\n  var d = it.json;\n  if (!d.paper || !d.paper.id) return;\n  var title = clean(d.paper.title || d.title);\n  var summary = clean(d.paper.ai_summary || d.summary);\n  if (OFFTOPIC.test(title + ' ' + summary)) return;\n  articles.push({\n    source: 'HuggingFace',\n    category: categorize(title, summary, 'research'),\n    title: title,\n    summary: truncate(summary, 350),\n    url: 'https://huggingface.co/papers/' + d.paper.id,\n    upvotes: d.paper.upvotes || 0,\n    type: 'research'\n  });\n});\n\n// 2. arXiv XML Feed\n// Look for raw XML string containing feed entries\nvar arxivArticles = [];\nitems.forEach(function(it) {\n  var d = it.json;\n  if (!d.data || typeof d.data !== 'string' || !d.data.includes('<feed')) return;\n  var entryRegex = /<entry>([\\s\\S]*?)<\\/entry>/g;\n  var match;\n  while ((match = entryRegex.exec(d.data)) !== null) {\n    var e = match[1];\n    var tM = e.match(/<title>([\\s\\S]*?)<\\/title>/);\n    var sM = e.match(/<summary>([\\s\\S]*?)<\\/summary>/);\n    var lM = e.match(/<link href=\"([^\"]+)\" rel=\"alternate\"/);\n    if (!tM || !lM) continue;\n    var title = clean(tM[1]);\n    var summary = clean(sM ? sM[1] : '');\n    if (OFFTOPIC.test(title + ' ' + summary)) continue;\n    arxivArticles.push({\n      source: 'arXiv',\n      category: categorize(title, summary, 'research'),\n      title: title,\n      summary: truncate(summary, 350),\n      url: lM[1],\n      upvotes: 0,\n      type: 'research'\n    });\n  }\n});\narticles = articles.concat(arxivArticles.slice(0, 10));\n\n// 3. Messages Perplexity / Recherche IA\nitems.forEach(function(it) {\n  var d = it.json;\n  var msgText = typeof d.message === 'string' ? d.message\n              : (d.message && typeof d.message.content === 'string') ? d.message.content\n              : (d.choices && d.choices[0] && d.choices[0].message && typeof d.choices[0].message.content === 'string') ? d.choices[0].message.content\n              : null;\n  var cites = d.citations || [];\n  if (!msgText || !Array.isArray(cites)) return;\n  var msg = msgText;\n\n  // Format A: \"- [N] **Source** - texte ... URL: https://...\"\n  if (/- \\[\\d+\\] \\*\\*/.test(msg)) {\n    var reA = /- \\[(\\d+)\\]\\s*\\*\\*([^*]+)\\*\\*\\s*-\\s*([\\s\\S]+?)(?=\\n- \\[|\\n\\n\\n|$)/g;\n    var m;\n    while ((m = reA.exec(msg)) !== null) {\n      var n = parseInt(m[1]) - 1;\n      var src = m[2].trim();\n      var body = m[3];\n      var urlM = body.match(/URL: (https?:\\/\\/[^\\s\\n]+)/);\n      var url = urlM ? urlM[1] : (cites[n] || '');\n      if (!url || !isSpecificUrl(url)) continue;\n      var text = clean(body.replace(/URL: https?:\\/\\/[^\\s\\n]+/, ''));\n      var first = text.match(/^(.{10,120})[.;]/);\n      var title = first ? first[1] : truncate(text, 120);\n      var summary = truncate(text, 350);\n      articles.push({\n        source: clean(src),\n        category: categorize(title, summary, 'news'),\n        title: title,\n        summary: summary,\n        url: url,\n        upvotes: 4,\n        type: 'news'\n      });\n    }\n  }\n\n  // Format B: \"- **Titre**\\n  [SOURCE] ...\\n  Resume ... [N]\\n  URL\"\n  if (/- \\*\\*[^*\\n]+\\*\\*/.test(msg) && /\\[SOURCE\\]/.test(msg)) {\n    msg.split(/(?=\\n- \\*\\*)/).forEach(function(seg) {\n      var tM = seg.match(/- \\*\\*([^*\\n]+)\\*\\*/);\n      var sM = seg.match(/\\[SOURCE\\]\\s*([^\\n]+)/);\n      var rM = seg.match(/R[ée]sum[ée]\\s*:\\s*([\\s\\S]*?)(?:\\n\\s*URL|\\n\\s*---|\\n\\s*###|$)/);\n      if (!tM || !rM) return;\n      var resume = rM[1].trim();\n      var refs = resume.match(/\\[(\\d+)\\]/g) || [];\n      var lastN = refs.length ? parseInt(refs[refs.length - 1].replace(/[\\[\\]]/g, '')) - 1 : null;\n      var url = (lastN !== null && cites[lastN]) ? cites[lastN] : '';\n      if (!url || !isSpecificUrl(url)) return;\n      resume = truncate(clean(resume.replace(/\\[\\d+\\]/g, '')), 350);\n      var srcName = sM ? clean(sM[1]).split(/[\\u2013\\u2014]/)[0].trim() : 'Veille IA';\n      var title = clean(tM[1]);\n      articles.push({\n        source: srcName.substring(0, 40),\n        category: categorize(title, resume, 'news'),\n        title: title,\n        summary: resume,\n        url: url,\n        upvotes: 4,\n        type: 'news'\n      });\n    });\n  }\n\n  // Format C: parseur generique ligne par ligne\n  var seen_local = new Set();\n  if (!/- \\[\\d+\\] \\*\\*/.test(msg) && !(/- \\*\\*[^*\\n]+\\*\\*/.test(msg) && /\\[SOURCE\\]/.test(msg))) {\n    var lines = msg.split(/\\n/);\n    for (var li = 0; li < lines.length; li++) {\n      var line = lines[li].trim();\n      if (!line) continue;\n      if (/^(ainsi qu|voici|recherche|source|les act|les nou|###|---|\\*\\*\\*)/i.test(line)) continue;\n      if (/^\\d+\\.?\\s*$/.test(line)) continue;\n      var urlM = line.match(/(https?:\\/\\/[^\\s\\n,;)\\]>]+)/);\n      if (!urlM) continue;\n      var url = urlM[1].replace(/[)\\]>,;]+$/, '');\n      if (!isSpecificUrl(url) || seen_local.has(url)) continue;\n      var desc = line.substring(0, urlM.index).replace(/^[-\\u2022*]\\s*/, '').replace(/URL:\\s*/i, '').trim();\n      var srcM = desc.match(/^\\[([^\\]]+)\\]/);\n      var source = srcM ? srcM[1].trim() : 'Perplexity';\n      var text = srcM ? desc.substring(srcM[0].length).trim() : desc;\n      var first = text.match(/^(.{15,120})[\\.;]/);\n      var title = first ? first[1].trim() : text.substring(0, 100).replace(/\\s+$/, '');\n      var summary = text.length > 350 ? text.substring(0, 350) : text;\n      seen_local.add(url);\n      articles.push({\n        source: source,\n        category: categorize(title, summary, 'news'),\n        title: title,\n        summary: summary,\n        url: url,\n        upvotes: 4,\n        type: 'news'\n      });\n    }\n  }\n});\n\n// Deduplication par URL\nvar seen = {};\narticles = articles.filter(function(a) {\n  if (!a.url || seen[a.url] || seenUrls[a.url]) return false;\n  seen[a.url] = true;\n  return true;\n});\n\nif (articles.length === 0) {\n  return { prompt: \"Aucune actualite aujourd'hui.\", total: 0, articles: [] };\n}\n\n// Tri: news en tete, puis research par upvotes decroissants\narticles.sort(function(a, b) {\n  if (a.type === 'news' && b.type !== 'news') return -1;\n  if (a.type !== 'news' && b.type === 'news') return 1;\n  return b.upvotes - a.upvotes;\n});\n\n// Construction du prompt\nvar today = new Date().toLocaleDateString('fr-FR', {\n  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'\n});\n\nvar newsCount = articles.filter(function(a) { return a.type === 'news'; }).length;\n\nvar lines = [\n  'Date : ' + today,\n  articles.length + ' actualites disponibles (' + newsCount + ' actualites industrie + ' + (articles.length - newsCount) + ' papers de recherche).',\n  '',\n  '== ARTICLES ============================================'\n];\n\narticles.forEach(function(a, i) {\n  lines.push('');\n  lines.push((i + 1) + '. [' + a.source + ' ' + a.category + '] ' + a.title);\n  if (a.summary) lines.push('   ' + a.summary);\n  lines.push('   URL: ' + a.url);\n  if (a.upvotes > 0) lines.push('   (' + a.upvotes + ' upvotes)');\n});\n\nlines.push('');\nlines.push('====================================================');\nlines.push('');\nlines.push('MISSION:');\nlines.push('Selectionne exactement 10 articles en respectant ce mix:');\nlines.push('  - Idealement au moins 4 articles News (numeros 1 a ' + newsCount + ' dans la liste)');\nlines.push('  - Si moins de 4 News disponibles, completer avec des Research supplementaires');\nlines.push('  - Au moins 4 articles Research (papers pertinents pour des praticiens IT)');\nlines.push('  - Le reste au choix selon la pertinence');\nlines.push('');\nlines.push('Pour chaque article retenu:');\nlines.push('  - Titre cliquable vers URL ci-dessus');\nlines.push('  - Badge type: Research | News | Outil');\nlines.push('  - 2-3 phrases de resume en francais');\nlines.push('');\nlines.push('En-tete attendu: \"Veille IA - ' + today + '\"');\n\nreturn {\n  prompt: lines.join('\\n'),\n  total: articles.length,\n  articles: articles\n};\n"
+      },
+      "name": "Format prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        96
+      ],
+      "id": "61314f78-42b8-465c-ae8f-2952c5e05ed6"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ====================================================\n// Veille IA — Sauvegarde top 10 LLM → Notion\n// Reçoit la sortie HTML du LLM (champ \"output\")\n// Extrait les articles sélectionnés et les persiste\n// ====================================================\n\n// Nettoyer les éventuelles balises markdown autour du HTML\nvar raw = ($input.first().json.output || '')\n  .replace(/^```html\\s*/i, '')\n  .replace(/\\s*```\\s*$/, '');\n\nvar now = new Date().toISOString();\nvar saved = 0;\nvar skipped = 0;\nvar errors = [];\n\n// ── Extraction des articles depuis le HTML ──\n// Deux patterns possibles selon le format du LLM :\n// (A) Blocs <div class=\"article\"> avec <span class=\"badge\"> + <h2><a href>\n// (B) Fallback : tous les <h2><a href=\"...\"> présents dans le HTML\n\nvar articles = [];\n\n// Tentative (A) : blocs structurés\nvar blocks = raw.match(/<div[^>]*class=\"article\"[^>]*>[\\s\\S]*?<\\/div>/g) || [];\n\nif (blocks.length > 0) {\n  blocks.forEach(function(block) {\n    var badgeM = block.match(/<span[^>]*>([\\s\\S]*?)<\\/span>/);\n    var linkM  = block.match(/<h2[^>]*>[\\s\\S]*?<a\\s+href=\"([^\"]+)\"[^>]*>([\\s\\S]*?)<\\/a>/);\n    if (!linkM) return;\n    articles.push({\n      url:   linkM[1],\n      title: linkM[2].replace(/<[^>]+>/g, '').trim(),\n      badge: badgeM ? badgeM[1].replace(/<[^>]+>/g, '').trim() : ''\n    });\n  });\n}\n\n// Fallback (B) : si le LLM a produit un HTML sans classes d'articles\nif (articles.length === 0) {\n  var h2Re = /<h2[^>]*>[\\s\\S]*?<a\\s+href=\"([^\"]+)\"[^>]*>([\\s\\S]*?)<\\/a>/g;\n  var m;\n  while ((m = h2Re.exec(raw)) !== null) {\n    articles.push({\n      url:   m[1],\n      title: m[2].replace(/<[^>]+>/g, '').trim(),\n      badge: ''\n    });\n  }\n}\n\n// ── Envoi vers Notion ──\nfor (var i = 0; i < articles.length; i++) {\n  var a = articles[i];\n  if (!a.url || !a.title) { skipped++; continue; }\n\n  try {\n    await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.notion.com/v1/pages',\n      headers: {\n        'Authorization':   'Bearer ' + $env.NOTION_TOKEN,\n        'Notion-Version':  '2022-06-28',\n        'Content-Type':    'application/json'\n      },\n      body: {\n        parent: { database_id: '38c15cc8-89a0-819c-b577-ec51eb502688' },\n        properties: {\n          'Titre article': { title:     [{ text: { content: a.title.substring(0, 150) } }] },\n          'URL':           { url:       a.url },\n          'Source':        { rich_text: [{ text: { content: a.badge.substring(0, 50)  } }] },\n          'Vu le':         { date:      { start: now } }\n        }\n      }\n    });\n    saved++;\n  } catch(e) {\n    errors.push({ url: a.url, error: e.message });\n  }\n}\n\nreturn [{ json: {\n  saved:   saved,\n  skipped: skipped,\n  total:   articles.length,\n  errors:  errors\n} }];"
+      },
+      "name": "Save to Notion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        272
+      ],
+      "id": "00a1b025-ac01-4649-bccc-f20619883825"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "Tu es un expert en veille IA. Produis UNIQUEMENT du HTML CSS inline. Pas de backticks. Utilise l'URL EXACTE fournie pour chaque news. Verifie que le lien pointe vers l article specifique, pas vers la page d accueil.\n\n- INTERDIS au ```html (début) et ```(fin)",
+          "maxIterations": 3
+        }
+      },
+      "name": "Agent Synthese",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1408,
+        96
+      ],
+      "id": "bdcbc954-d195-4d9f-8c87-2abcc0236480"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-5-20250929",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {
+          "maxTokensToSample": 3000,
+          "temperature": 0.3
+        }
+      },
+      "name": "Claude Sonnet 4.5",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1312,
+        336
+      ],
+      "id": "34bfca57-9c70-4b81-a9e9-65010d529270",
+      "credentials": {
+        "anthropicApi": {
+          "id": "7h7iCjgmfwc33UgQ",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var out=$input.first().json; var html=out.output||out.text||'';\nif(!html||html.trim()===''){html='<div style=\"font-family:sans-serif;padding:20px\"><h2>Veille IA</h2><p>Aucune actualite aujourd hui.</p></div>';}\nreturn {html_body:html};"
+      },
+      "name": "Format email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        96
+      ],
+      "id": "08aba464-95b0-468a-8456-7428c24d4fa7"
+    },
+    {
+      "parameters": {
+        "sendTo": "wylliam.delaunay@gmail.com",
+        "subject": "={{ '\\ud83e\\udd16 Veille IA - ' + $now.format('dd/MM/yyyy') }}",
+        "message": "={{ $json.html_body }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "Veille IA Digest"
+        }
+      },
+      "name": "Gmail Envoi",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        96
+      ],
+      "id": "703e3c61-073c-46d4-9991-1dba7d472bac",
+      "webhookId": "03f09621-76b2-435c-8d2f-28452261f239",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "HWscsylP5wBE8mhn",
+          "name": "Main Gmail Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        672,
+        64
+      ],
+      "id": "b8674017-8bfd-4d22-ba5c-fd05f8d58713",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ====================================================\n// Veille IA — Déduplication Notion\n// Positionner CE NODE entre le Merge et normalisation-prompt.js\n//\n// Ce node :\n//   1. Interroge Notion pour récupérer toutes les URLs déjà envoyées\n//   2. Passe tous les items originaux inchangés\n//   3. Ajoute un item spécial { _seenUrls: [...] } en fin de liste\n//\n// normalisation-prompt.js lit _seenUrls et filtre les articles déjà vus.\n// ====================================================\n\nvar NOTION_TOKEN = $env.NOTION_TOKEN;\nvar DATABASE_ID  = '38c15cc8-89a0-819c-b577-ec51eb502688';\n\nvar headers = {\n  'Authorization':  'Bearer ' + NOTION_TOKEN,\n  'Notion-Version': '2022-06-28',\n  'Content-Type':   'application/json'\n};\n\n// ── Récupérer toutes les URLs Notion (pagination) ──\nvar seenUrls = {};\nvar hasMore = true;\nvar startCursor = null;\n\ntry {\n  while (hasMore) {\n    var body = { page_size: 100 };\n    if (startCursor) body.start_cursor = startCursor;\n\n    var resp = await this.helpers.httpRequest({\n      method:  'POST',\n      url:     'https://api.notion.com/v1/databases/' + DATABASE_ID + '/query',\n      headers: headers,\n      body:    body\n    });\n\n    (resp.results || []).forEach(function(page) {\n      var props = page.properties || {};\n      var url   = props['URL'] && props['URL'].url;\n      if (url) seenUrls[url] = true;\n    });\n\n    hasMore      = resp.has_more;\n    startCursor  = resp.next_cursor || null;\n  }\n} catch(e) {\n  // En cas d'erreur Notion, on continue sans filtrer plutôt que de bloquer\n  seenUrls = {};\n}\n\nvar seenList = Object.keys(seenUrls);\n\n// ── Passer tous les items originaux + item de déduplication ──\nvar items = $input.all();\nitems.push({ json: { _seenUrls: seenList } });\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        96
+      ],
+      "id": "def7053d-08a9-42d4-9024-c19a9d687e5b",
+      "name": "Notion dedup"
+    }
+  ],
+  "connections": {
+    "Schedule 7h": {
+      "main": [
+        [
+          {
+            "node": "ArXiv",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HuggingFace",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Perplexity News",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Perplexity Tools",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ArXiv": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HuggingFace": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Perplexity News": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Perplexity Tools": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Format prompt": {
+      "main": [
+        [
+          {
+            "node": "Agent Synthese",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Synthese": {
+      "main": [
+        [
+          {
+            "node": "Format email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save to Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Sonnet 4.5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent Synthese",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format email": {
+      "main": [
+        [
+          {
+            "node": "Gmail Envoi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Notion dedup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion dedup": {
+      "main": [
+        [
+          {
+            "node": "Format prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "node:Schedule 7h": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "sourceWorkflowId": null
+}

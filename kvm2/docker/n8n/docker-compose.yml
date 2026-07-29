@@ -100,6 +100,7 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
       - /local-files:/files
+      - /var/local/hermes/factfulness_log.json:/files/factfulness_log.json:ro
 
 networks:
   default:

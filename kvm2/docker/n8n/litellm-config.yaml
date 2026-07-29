@@ -1,7 +1,7 @@
 # LiteLLM Proxy Config — Migration API DeepSeek directe
 # rapide → V4 Flash (DeepSeek direct)
 # code   → V4 Pro (DeepSeek direct, fallback → rapide)
-# review → Kimi K3 (OpenRouter, ex-Claude Opus 4.8)
+# review → GLM-5.2 (OpenRouter — second avis distinct de `code`, remplace Kimi K3 trop lent/cher)
 # raisonnement → V4 Pro (DeepSeek direct)
 
 model_list:
@@ -23,13 +23,13 @@ model_list:
     fallbacks:
       - rapide
 
-  # Review : code review + consolidation — Kimi K3 (OpenRouter)
+  # Review : code review + consolidation — GLM-5.2 (OpenRouter)
   - model_name: review
     litellm_params:
-      model: openrouter/moonshotai/kimi-k3
+      model: openrouter/z-ai/glm-5.2
       api_key: os.environ/OPENROUTER_API_KEY
-      input_cost_per_token: 0.000003
-      output_cost_per_token: 0.000015
+      input_cost_per_token: 0.00000025
+      output_cost_per_token: 0.00000079
 
   # Raisonnement : planification, architecture — V4 Pro direct
   - model_name: raisonnement

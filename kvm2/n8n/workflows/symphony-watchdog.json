@@ -1,0 +1,557 @@
+{
+  "id": "symphonyWatchdog01",
+  "name": "symphony-watchdog",
+  "description": "Phase 2 Symphony : cron 5min sur le ticket repo:agent-infra actuellement In Progress (timeout, budget /spend LiteLLM, boucle d'auto-correction 3 essais via GitHub Checks) + webhook run-dev-report (commentaire informatif seulement, aucune transition). NON VÉRIFIÉ contre l'instance n8n / le board Linear réels — cf. feedback-n8n-deploy-gotchas.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "wd-schedule-1",
+      "name": "Cron 5min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 5 }] }
+      }
+    },
+    {
+      "id": "wd-config-1",
+      "name": "Config repo cible",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "parameters": {
+        "jsCode": "// Même config que symphony-dispatcher — un seul repo pour l'instant, mais le\n// paramètre reste explicite (cf. plan Phase 2, exigence \"repo dès le jour 1\").\nreturn [{ json: { owner: 'Exawyll', repo: 'agent-infra', repoLabel: 'repo:agent-infra', workflowFile: 'symphony-run-dev.yml' } }];"
+      }
+    },
+    {
+      "id": "wd-http-inprogress-1",
+      "name": "Linear: query In Progress (repo)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { issues(filter: { labels: { name: { eq: \\\"repo:agent-infra\\\" } }, state: { name: { eq: \\\"${$env.LINEAR_STATE_IN_PROGRESS || 'In Progress'}\\\" } } }, first: 5) { nodes { id identifier title description startedAt labels { nodes { id name } } } } }` }) }}"
+      }
+    },
+    {
+      "id": "wd-code-pick-1",
+      "name": "Prendre le ticket actif",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0],
+      "parameters": {
+        "jsCode": "// Invariant SPEC : concurrence = 1 run/repo, donc au plus 1 ticket ici en\n// fonctionnement normal. On ne traite que le premier — un item supplémentaire\n// signalerait une violation de concurrence à investiguer manuellement, pas\n// un cas que ce workflow doit deviner comment réparer.\nconst resp = $input.first().json;\nconst issues = (resp.data && resp.data.issues && resp.data.issues.nodes) || [];\nif (issues.length === 0) return []; // rien In Progress — rien à faire ce tour-ci\n\nconst ticket = issues[0];\nconst labelNames = (ticket.labels.nodes || []).map((l) => l.name);\nconst attemptLabel = labelNames.find((n) => /^attempt:\\d+$/.test(n));\nconst attempt = attemptLabel ? parseInt(attemptLabel.split(':')[1], 10) : 1;\nconst essaisEpuisesAlready = labelNames.includes('essais-epuises');\nconst elapsedMin = (Date.now() - new Date(ticket.startedAt).getTime()) / 60000;\n\nreturn [{ json: { ticket, attempt, essaisEpuisesAlready, elapsedMin, branch: `feat/${ticket.identifier}-symphony-run` } }];"
+      }
+    },
+    {
+      "id": "wd-http-spend-1",
+      "name": "LiteLLM: key info agent-dev",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, -120],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.LITELLM_INTERNAL_URL || 'http://litellm:4000') + '/key/info' }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [{ "name": "key", "value": "={{ $env.LITELLM_AGENT_DEV_KEY }}" }]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.LITELLM_MASTER_KEY }}" }]
+        }
+      }
+    },
+    {
+      "id": "wd-http-resolve-1",
+      "name": "Linear: resolve states + labels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 120],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { team(id: \\\"${$env.LINEAR_TEAM_ID}\\\") { states { nodes { id name } } labels { nodes { id name } } } }` }) }}"
+      }
+    },
+    {
+      "id": "wd-code-decide-1",
+      "name": "Décision timeout/budget",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 0],
+      "parameters": {
+        "jsCode": "const picked = $('Prendre le ticket actif').first().json;\nconst spendResp = $('LiteLLM: key info agent-dev').first().json;\nconst resolved = $('Linear: resolve states + labels').first().json;\n\nconst states = (resolved.data && resolved.data.team && resolved.data.team.states.nodes) || [];\nconst labels = (resolved.data && resolved.data.team && resolved.data.team.labels.nodes) || [];\n\nconst timeoutMin = Number($env.RUN_TIMEOUT_MIN || 45);\nconst budgetUsd = Number($env.RUN_BUDGET_USD || 20);\nconst spend = (spendResp.info && spendResp.info.spend) || 0;\n\nconst timeoutExceeded = picked.elapsedMin > timeoutMin;\nconst budgetExceeded = spend > budgetUsd;\nconst needsTriage = timeoutExceeded || budgetExceeded;\n\nlet reason = null;\nif (timeoutExceeded) reason = `Timeout dépassé (${Math.round(picked.elapsedMin)} min > ${timeoutMin} min).`;\nelse if (budgetExceeded) reason = `Budget dépassé ($${spend.toFixed(2)} > $${budgetUsd}).`;\n\nconst triageState = states.find((s) => s.name === ($env.LINEAR_STATE_TRIAGE || 'Triage'));\nif (needsTriage && !triageState) {\n  throw new Error('State Triage introuvable — vérifier LINEAR_STATE_TRIAGE / le board réel.');\n}\n\nreturn [{\n  json: {\n    ...picked,\n    needsTriage,\n    reason,\n    triageStateId: triageState ? triageState.id : null,\n    labelsByName: Object.fromEntries(labels.map((l) => [l.name, l.id]))\n  }\n}];"
+      }
+    },
+    {
+      "id": "wd-if-triage-1",
+      "name": "Besoin Triage ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 0],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.needsTriage }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "wd-http-transition-triage-1",
+      "name": "Linear: transition -> Triage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, -140],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { issueUpdate(id: \\\"${$json.ticket.id}\\\", input: { stateId: \\\"${$json.triageStateId}\\\" }) { success } }` }) }}"
+      }
+    },
+    {
+      "id": "wd-http-comment-triage-1",
+      "name": "Linear: commentaire raison",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, -140],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { commentCreate(input: { issueId: \\\"${$('Décision timeout/budget').first().json.ticket.id}\\\", body: \\\"⏱️ Retour en Triage par le watchdog Symphony — ${$('Décision timeout/budget').first().json.reason}\\\" }) { success } }` }) }}"
+      }
+    },
+    {
+      "id": "wd-http-alert-telegram-1",
+      "name": "Alerte Telegram (webhook Hermes dev)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, -140],
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.106.174.46:8645/symphony-watchdog-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-Webhook-Secret", "value": "={{ $env.HERMES_DEV_WEBHOOK_SECRET }}" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ticket_identifier: $('Décision timeout/budget').first().json.ticket.identifier, reason: $('Décision timeout/budget').first().json.reason }) }}"
+      }
+    },
+    {
+      "id": "wd-http-findpr-1",
+      "name": "GitHub: chercher PR ouverte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 140],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.github.com/repos/' + $('Config repo cible').first().json.owner + '/' + $('Config repo cible').first().json.repo + '/pulls' }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "head", "value": "={{ $('Config repo cible').first().json.owner + ':' + $json.branch }}" },
+            { "name": "state", "value": "open" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github+json" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wd-if-pr-exists-1",
+      "name": "PR ouverte ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1760, 140],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.length }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "wd-http-checkruns-1",
+      "name": "GitHub: check-runs de la branche",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 140],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.github.com/repos/' + $('Config repo cible').first().json.owner + '/' + $('Config repo cible').first().json.repo + '/commits/' + $('Décision timeout/budget').first().json.branch + '/check-runs' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github+json" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wd-code-verdict-1",
+      "name": "Verdict CI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 140],
+      "parameters": {
+        "jsCode": "const runs = $input.first().json.check_runs || [];\nconst pending = runs.some((r) => r.status !== 'completed');\nconst failed = runs.some((r) => r.status === 'completed' && !['success', 'neutral', 'skipped'].includes(r.conclusion));\n\nlet verdict = 'pass';\nif (pending) verdict = 'pending';\nelse if (failed) verdict = 'fail';\n\nconst decision = $('Décision timeout/budget').first().json;\nreturn [{ json: { ...decision, ciVerdict: verdict } }];"
+      }
+    },
+    {
+      "id": "wd-if-ci-failed-1",
+      "name": "CI en échec ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2420, 140],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.ciVerdict }}", "rightValue": "fail", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "wd-if-attempt-remaining-1",
+      "name": "Essais restants ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2640, 60],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.attempt }}", "rightValue": 3, "operator": { "type": "number", "operation": "lt" } }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "wd-code-nextattempt-1",
+      "name": "Préparer relabel attempt:N+1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2860, -20],
+      "parameters": {
+        "jsCode": "const d = $json;\nconst nextAttempt = d.attempt + 1;\nconst oldLabelId = d.labelsByName[`attempt:${d.attempt}`];\nconst newLabelId = d.labelsByName[`attempt:${nextAttempt}`];\nif (!oldLabelId || !newLabelId) {\n  throw new Error(`Label attempt:${d.attempt} ou attempt:${nextAttempt} introuvable — créer les labels attempt:1/2/3 sur le board Linear (Prérequis Phase 2).`);\n}\nreturn [{ json: { ...d, nextAttempt, oldLabelId, newLabelId } }];"
+      }
+    },
+    {
+      "id": "wd-http-removelabel-1",
+      "name": "Linear: retirer attempt:N",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3080, -20],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { issueRemoveLabel(id: \\\"${$json.ticket.id}\\\", labelId: \\\"${$json.oldLabelId}\\\") { success } }` }) }}"
+      }
+    },
+    {
+      "id": "wd-http-addlabel-1",
+      "name": "Linear: ajouter attempt:N+1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, -20],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { issueAddLabel(id: \\\"${$('Préparer relabel attempt:N+1').first().json.ticket.id}\\\", labelId: \\\"${$('Préparer relabel attempt:N+1').first().json.newLabelId}\\\") { success } }` }) }}"
+      }
+    },
+    {
+      "id": "wd-http-redispatch-1",
+      "name": "GitHub: workflow_dispatch (auto-correction)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3520, -20],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.github.com/repos/' + $('Config repo cible').first().json.owner + '/' + $('Config repo cible').first().json.repo + '/actions/workflows/' + $('Config repo cible').first().json.workflowFile + '/dispatches' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github+json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const d = $('Préparer relabel attempt:N+1').first().json; return JSON.stringify({ ref: 'main', inputs: { ticket_id: d.ticket.id, ticket_identifier: d.ticket.identifier, title: d.ticket.title, acceptance_criteria: d.ticket.description, repo: 'Exawyll/agent-infra', attempt: String(d.nextAttempt) } }); })() }}"
+      }
+    },
+    {
+      "id": "wd-code-alreadyflagged-1",
+      "name": "Déjà signalé essais-epuises ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2860, 220],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.essaisEpuisesAlready }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notEquals" } }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "wd-http-labelepuise-1",
+      "name": "Linear: label essais-epuises",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3080, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { issueAddLabel(id: \\\"${$json.ticket.id}\\\", labelId: \\\"${$json.labelsByName['essais-epuises']}\\\") { success } }` }) }}"
+      }
+    },
+    {
+      "id": "wd-http-commentepuise-1",
+      "name": "Linear: commentaire essais épuisés",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { commentCreate(input: { issueId: \\\"${$('Déjà signalé essais-epuises ?').first().json.ticket.id}\\\", body: \\\"⚠️ 3 essais d'auto-correction consommés, CI toujours en échec — review humaine requise. La PR reste ouverte, aucun rejet automatique (doctrine SPEC : l'humain dispose).\\\" }) { success } }` }) }}"
+      }
+    },
+    {
+      "id": "wd-webhook-report-1",
+      "name": "Webhook run-dev-report",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 500],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "run-dev-report",
+        "authentication": "none",
+        "options": { "rawBody": true }
+      },
+      "webhookId": "run-dev-report"
+    },
+    {
+      "id": "wd-code-verifysig-1",
+      "name": "Vérifier signature HMAC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 500],
+      "parameters": {
+        "jsCode": "// Même schéma que linear-inbound.json — HMAC-SHA256 sur le corps brut,\n// secret partagé avec le GitHub Actions secret RUN_DEV_REPORT_SECRET.\nconst crypto = require('crypto');\nconst secret = $env.RUN_DEV_REPORT_SECRET;\nif (!secret) throw new Error('RUN_DEV_REPORT_SECRET manquant');\n\nconst item = $input.first();\nconst rawBodyBase64 = item.binary && item.binary.data && item.binary.data.data;\nif (!rawBodyBase64) throw new Error('Corps brut introuvable — activer Raw Body sur le Webhook.');\n\nconst rawBody = Buffer.from(rawBodyBase64, 'base64');\nconst signatureHeader = ((item.json.headers && item.json.headers['x-signature']) || '').toString();\nconst expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');\n\nconst expectedBuf = Buffer.from(expected, 'utf8');\nconst receivedBuf = Buffer.from(signatureHeader, 'utf8');\nconst valid = expectedBuf.length === receivedBuf.length && crypto.timingSafeEqual(expectedBuf, receivedBuf);\nif (!valid) throw new Error('Signature invalide — requête rejetée');\n\nreturn [{ json: JSON.parse(rawBody.toString('utf8')) }];"
+      }
+    },
+    {
+      "id": "wd-http-commentreport-1",
+      "name": "Linear: commentaire informatif",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 500],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const r = $json; const status = r.pushed ? `PR : ${r.pr_url || '(inconnue)'}` : 'Aucun commit produit'; const body = `🤖 run-dev tentative ${r.attempt} — ${r.run_status} — ${status}`; return JSON.stringify({ query: `mutation { commentCreate(input: { issueId: \\\"${r.ticket_id}\\\", body: \\\"${body}\\\" }) { success } }` }); })() }}"
+      }
+    }
+  ],
+  "connections": {
+    "Cron 5min": {
+      "main": [[
+        { "node": "Config repo cible", "type": "main", "index": 0 },
+        { "node": "Linear: query In Progress (repo)", "type": "main", "index": 0 }
+      ]]
+    },
+    "Linear: query In Progress (repo)": {
+      "main": [[ { "node": "Prendre le ticket actif", "type": "main", "index": 0 } ]]
+    },
+    "Prendre le ticket actif": {
+      "main": [[
+        { "node": "LiteLLM: key info agent-dev", "type": "main", "index": 0 },
+        { "node": "Linear: resolve states + labels", "type": "main", "index": 0 }
+      ]]
+    },
+    "Linear: resolve states + labels": {
+      "main": [[ { "node": "Décision timeout/budget", "type": "main", "index": 0 } ]]
+    },
+    "Décision timeout/budget": {
+      "main": [[ { "node": "Besoin Triage ?", "type": "main", "index": 0 } ]]
+    },
+    "Besoin Triage ?": {
+      "main": [
+        [ { "node": "Linear: transition -> Triage", "type": "main", "index": 0 } ],
+        [ { "node": "GitHub: chercher PR ouverte", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Linear: transition -> Triage": {
+      "main": [[ { "node": "Linear: commentaire raison", "type": "main", "index": 0 } ]]
+    },
+    "Linear: commentaire raison": {
+      "main": [[ { "node": "Alerte Telegram (webhook Hermes dev)", "type": "main", "index": 0 } ]]
+    },
+    "GitHub: chercher PR ouverte": {
+      "main": [[ { "node": "PR ouverte ?", "type": "main", "index": 0 } ]]
+    },
+    "PR ouverte ?": {
+      "main": [
+        [ { "node": "GitHub: check-runs de la branche", "type": "main", "index": 0 } ],
+        []
+      ]
+    },
+    "GitHub: check-runs de la branche": {
+      "main": [[ { "node": "Verdict CI", "type": "main", "index": 0 } ]]
+    },
+    "Verdict CI": {
+      "main": [[ { "node": "CI en échec ?", "type": "main", "index": 0 } ]]
+    },
+    "CI en échec ?": {
+      "main": [
+        [ { "node": "Essais restants ?", "type": "main", "index": 0 } ],
+        []
+      ]
+    },
+    "Essais restants ?": {
+      "main": [
+        [ { "node": "Préparer relabel attempt:N+1", "type": "main", "index": 0 } ],
+        [ { "node": "Déjà signalé essais-epuises ?", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Préparer relabel attempt:N+1": {
+      "main": [[ { "node": "Linear: retirer attempt:N", "type": "main", "index": 0 } ]]
+    },
+    "Linear: retirer attempt:N": {
+      "main": [[ { "node": "Linear: ajouter attempt:N+1", "type": "main", "index": 0 } ]]
+    },
+    "Linear: ajouter attempt:N+1": {
+      "main": [[ { "node": "GitHub: workflow_dispatch (auto-correction)", "type": "main", "index": 0 } ]]
+    },
+    "Déjà signalé essais-epuises ?": {
+      "main": [
+        [ { "node": "Linear: label essais-epuises", "type": "main", "index": 0 } ],
+        []
+      ]
+    },
+    "Linear: label essais-epuises": {
+      "main": [[ { "node": "Linear: commentaire essais épuisés", "type": "main", "index": 0 } ]]
+    },
+    "Webhook run-dev-report": {
+      "main": [[ { "node": "Vérifier signature HMAC", "type": "main", "index": 0 } ]]
+    },
+    "Vérifier signature HMAC": {
+      "main": [[ { "node": "Linear: commentaire informatif", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "tags": []
+}

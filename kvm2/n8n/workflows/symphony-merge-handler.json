@@ -1,0 +1,428 @@
+{
+  "id": "symphonyMergeHandler01",
+  "name": "symphony-merge-handler",
+  "description": "Phase 2 Symphony : webhook GitHub pull_request (closed) → Done (merge) ou règle des rejets SPEC (Ready si 1er rejet, Triage + reformulation humaine si 2e consécutif). Preuve de travail postée sur le ticket au merge. NON VÉRIFIÉ contre l'instance n8n / le board Linear réels — cf. feedback-n8n-deploy-gotchas.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "mh-webhook-1",
+      "name": "Webhook GitHub pull_request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "symphony-merge-handler",
+        "authentication": "none",
+        "options": { "rawBody": true }
+      },
+      "webhookId": "symphony-merge-handler"
+    },
+    {
+      "id": "mh-code-verifysig-1",
+      "name": "Vérifier signature GitHub",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "parameters": {
+        "jsCode": "// GitHub signe en HMAC-SHA256, header `X-Hub-Signature-256: sha256=<hex>`\n// (préfixe différent du header Linear `Linear-Signature`, cf. linear-inbound.json).\nconst crypto = require('crypto');\nconst secret = $env.GITHUB_WEBHOOK_SECRET;\nif (!secret) throw new Error('GITHUB_WEBHOOK_SECRET manquant');\n\nconst item = $input.first();\nconst rawBodyBase64 = item.binary && item.binary.data && item.binary.data.data;\nif (!rawBodyBase64) throw new Error('Corps brut introuvable — activer Raw Body sur le Webhook.');\n\nconst rawBody = Buffer.from(rawBodyBase64, 'base64');\nconst header = ((item.json.headers && item.json.headers['x-hub-signature-256']) || '').toString();\nconst signatureHeader = header.replace(/^sha256=/, '');\nconst expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');\n\nconst expectedBuf = Buffer.from(expected, 'utf8');\nconst receivedBuf = Buffer.from(signatureHeader, 'utf8');\nconst valid = expectedBuf.length === receivedBuf.length && crypto.timingSafeEqual(expectedBuf, receivedBuf);\nif (!valid) throw new Error('Signature GitHub invalide — requête rejetée');\n\nconst payload = JSON.parse(rawBody.toString('utf8'));\nif (payload.action !== 'closed') return []; // on ne s'intéresse qu'à la fermeture (merge ou non)\n\nreturn [{ json: payload }];"
+      }
+    },
+    {
+      "id": "mh-code-extract-1",
+      "name": "Extraire ticket_identifier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0],
+      "parameters": {
+        "jsCode": "// Convention git-conventions.md : \"Closes RALPH-42\" dans le corps de la PR.\nconst pr = $json.pull_request;\nconst body = pr.body || '';\nconst match = body.match(/Closes\\s+([A-Z]+-\\d+)/i);\nif (!match) {\n  throw new Error('Aucun \"Closes <IDENTIFIER>\" trouvé dans le corps de la PR — impossible de relier un ticket Linear, abandon.');\n}\n\nreturn [{\n  json: {\n    ticketIdentifier: match[1].toUpperCase(),\n    merged: !!pr.merged,\n    additions: pr.additions,\n    deletions: pr.deletions,\n    changedFiles: pr.changed_files,\n    prUrl: pr.html_url,\n    headSha: pr.head.sha\n  }\n}];"
+      }
+    },
+    {
+      "id": "mh-http-getticket-1",
+      "name": "Linear: récupérer ticket + labels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, -120],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { issue(id: \\\"${$json.ticketIdentifier}\\\") { id identifier labels { nodes { id name } } } }` }) }}"
+      }
+    },
+    {
+      "id": "mh-http-resolve-1",
+      "name": "Linear: resolve states + labels (équipe)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 120],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { team(id: \\\"${$env.LINEAR_TEAM_ID}\\\") { states { nodes { id name } } labels { nodes { id name } } } }` }) }}"
+      }
+    },
+    {
+      "id": "mh-code-merge-context-1",
+      "name": "Construire contexte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0],
+      "parameters": {
+        "jsCode": "const extracted = $('Extraire ticket_identifier').first().json;\nconst ticketResp = $('Linear: récupérer ticket + labels').first().json;\nconst resolvedResp = $('Linear: resolve states + labels (équipe)').first().json;\n\nconst ticket = ticketResp.data && ticketResp.data.issue;\nif (!ticket) {\n  throw new Error(`Ticket Linear ${extracted.ticketIdentifier} introuvable.`);\n}\n\nconst states = (resolvedResp.data && resolvedResp.data.team && resolvedResp.data.team.states.nodes) || [];\nconst labels = (resolvedResp.data && resolvedResp.data.team && resolvedResp.data.team.labels.nodes) || [];\nconst labelsByName = Object.fromEntries(labels.map((l) => [l.name, l.id]));\n\nconst ticketLabelNames = (ticket.labels.nodes || []).map((l) => l.name);\nconst attemptLabel = ticketLabelNames.find((n) => /^attempt:\\d+$/.test(n));\nconst attempt = attemptLabel ? parseInt(attemptLabel.split(':')[1], 10) : 1;\nconst alreadyRejectedOnce = ticketLabelNames.includes('rejected:1');\n\nconst stateByName = Object.fromEntries(states.map((s) => [s.name, s.id]));\n\nreturn [{\n  json: {\n    ...extracted,\n    ticketId: ticket.id,\n    attempt,\n    alreadyRejectedOnce,\n    labelsByName,\n    stateByName\n  }\n}];"
+      }
+    },
+    {
+      "id": "mh-if-merged-1",
+      "name": "Mergée ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1100, 0],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.merged }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "mh-http-checkruns-1",
+      "name": "GitHub: check-runs (statut CI final)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, -180],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.github.com/repos/' + $env.GITHUB_REPO + '/commits/' + $json.headSha + '/check-runs' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github+json" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "mh-http-spend-1",
+      "name": "LiteLLM: key info agent-dev",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, -40],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.LITELLM_INTERNAL_URL || 'http://litellm:4000') + '/key/info' }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [{ "name": "key", "value": "={{ $env.LITELLM_AGENT_DEV_KEY }}" }]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.LITELLM_MASTER_KEY }}" }]
+        }
+      }
+    },
+    {
+      "id": "mh-http-transition-done-1",
+      "name": "Linear: transition -> Done",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, -110],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { issueUpdate(id: \\\"${$('Construire contexte').first().json.ticketId}\\\", input: { stateId: \\\"${$('Construire contexte').first().json.stateByName[$env.LINEAR_STATE_DONE || 'Done']}\\\" }) { success } }` }) }}"
+      }
+    },
+    {
+      "id": "mh-code-buildproof-1",
+      "name": "Construire preuve de travail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, -110],
+      "parameters": {
+        "jsCode": "const ctx = $('Construire contexte').first().json;\nconst checkRuns = ($('GitHub: check-runs (statut CI final)').first().json.check_runs) || [];\nconst ciFailed = checkRuns.some((r) => r.status === 'completed' && !['success', 'neutral', 'skipped'].includes(r.conclusion));\nconst ciStatus = checkRuns.length === 0 ? 'aucun check trouvé' : (ciFailed ? 'échec (mergé malgré tout — vérifier)' : 'vert');\n\nconst spendResp = $('LiteLLM: key info agent-dev').first().json;\nconst spend = (spendResp.info && spendResp.info.spend) || 0;\n\nconst body = [\n  '✅ Mergé — preuve de travail Symphony',\n  '',\n  `PR : ${ctx.prUrl}`,\n  `CI : ${ciStatus} (à la date de ce commentaire, ${new Date().toISOString()})`,\n  `Diff : +${ctx.additions} / -${ctx.deletions} sur ${ctx.changedFiles} fichier(s)`,\n  `Coût du run (clé LiteLLM agent-dev, cumulé) : $${spend.toFixed(2)}`,\n  `Essais d'auto-correction consommés : ${ctx.attempt}/3`\n].join('\\n');\n\nreturn [{ json: { ...ctx, body } }];"
+      }
+    },
+    {
+      "id": "mh-http-comment-done-1",
+      "name": "Linear: commentaire preuve de travail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, -110],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { commentCreate(input: { issueId: \\\"${$json.ticketId}\\\", body: \\\"${$json.body.replace(/\\n/g, '\\\\n').replace(/\"/g, '\\\\\\\"')}\\\" }) { success } }` }) }}"
+      }
+    },
+    {
+      "id": "mh-if-first-rejection-1",
+      "name": "1er rejet ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 200],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.alreadyRejectedOnce }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notEquals" } }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "mh-http-label-rejected1-1",
+      "name": "Linear: label rejected:1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 120],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { issueAddLabel(id: \\\"${$json.ticketId}\\\", labelId: \\\"${$json.labelsByName['rejected:1']}\\\") { success } }` }) }}"
+      }
+    },
+    {
+      "id": "mh-http-transition-ready-1",
+      "name": "Linear: transition -> Ready",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 120],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const ctx = $('Construire contexte').first().json; return JSON.stringify({ query: `mutation { issueUpdate(id: \\\"${ctx.ticketId}\\\", input: { stateId: \\\"${ctx.stateByName[$env.LINEAR_STATE_READY || 'Ready']}\\\" }) { success } }` }); })() }}"
+      }
+    },
+    {
+      "id": "mh-http-comment-retry-1",
+      "name": "Linear: commentaire retry direct",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 120],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const ctx = $('Construire contexte').first().json; return JSON.stringify({ query: `mutation { commentCreate(input: { issueId: \\\"${ctx.ticketId}\\\", body: \\\"❌ PR fermée sans merge (1er rejet, raison présumée mineure) — retour direct en Ready pour un nouvel essai. PR : ${ctx.prUrl}\\\" }) { success } }` }); })() }}"
+      }
+    },
+    {
+      "id": "mh-http-remove-agentok-1",
+      "name": "Linear: retirer agent:ok",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 320],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `mutation { issueRemoveLabel(id: \\\"${$json.ticketId}\\\", labelId: \\\"${$json.labelsByName[$env.LINEAR_LABEL_AGENT_OK || 'agent:ok']}\\\") { success } }` }) }}"
+      }
+    },
+    {
+      "id": "mh-http-remove-rejected1-1",
+      "name": "Linear: retirer rejected:1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 320],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const ctx = $('Construire contexte').first().json; return JSON.stringify({ query: `mutation { issueRemoveLabel(id: \\\"${ctx.ticketId}\\\", labelId: \\\"${ctx.labelsByName['rejected:1']}\\\") { success } }` }); })() }}"
+      }
+    },
+    {
+      "id": "mh-http-transition-triage-1",
+      "name": "Linear: transition -> Triage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 320],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const ctx = $('Construire contexte').first().json; return JSON.stringify({ query: `mutation { issueUpdate(id: \\\"${ctx.ticketId}\\\", input: { stateId: \\\"${ctx.stateByName[$env.LINEAR_STATE_TRIAGE || 'Triage']}\\\" }) { success } }` }); })() }}"
+      }
+    },
+    {
+      "id": "mh-http-comment-triage-1",
+      "name": "Linear: commentaire reformulation requise",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 320],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const ctx = $('Construire contexte').first().json; return JSON.stringify({ query: `mutation { commentCreate(input: { issueId: \\\"${ctx.ticketId}\\\", body: \\\"🛑 2e rejet consécutif — retour en Triage. Label agent:ok retiré. Reformule les critères d'acceptation avant de repasser ce ticket en Ready (doctrine SPEC : jamais de 3e essai automatique sur les mêmes critères). PR : ${ctx.prUrl}\\\" }) { success } }` }); })() }}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook GitHub pull_request": {
+      "main": [[ { "node": "Vérifier signature GitHub", "type": "main", "index": 0 } ]]
+    },
+    "Vérifier signature GitHub": {
+      "main": [[ { "node": "Extraire ticket_identifier", "type": "main", "index": 0 } ]]
+    },
+    "Extraire ticket_identifier": {
+      "main": [[
+        { "node": "Linear: récupérer ticket + labels", "type": "main", "index": 0 },
+        { "node": "Linear: resolve states + labels (équipe)", "type": "main", "index": 0 }
+      ]]
+    },
+    "Linear: resolve states + labels (équipe)": {
+      "main": [[ { "node": "Construire contexte", "type": "main", "index": 0 } ]]
+    },
+    "Construire contexte": {
+      "main": [[ { "node": "Mergée ?", "type": "main", "index": 0 } ]]
+    },
+    "Mergée ?": {
+      "main": [
+        [
+          { "node": "GitHub: check-runs (statut CI final)", "type": "main", "index": 0 },
+          { "node": "LiteLLM: key info agent-dev", "type": "main", "index": 0 },
+          { "node": "Linear: transition -> Done", "type": "main", "index": 0 }
+        ],
+        [ { "node": "1er rejet ?", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Linear: transition -> Done": {
+      "main": [[ { "node": "Construire preuve de travail", "type": "main", "index": 0 } ]]
+    },
+    "Construire preuve de travail": {
+      "main": [[ { "node": "Linear: commentaire preuve de travail", "type": "main", "index": 0 } ]]
+    },
+    "1er rejet ?": {
+      "main": [
+        [ { "node": "Linear: label rejected:1", "type": "main", "index": 0 } ],
+        [ { "node": "Linear: retirer agent:ok", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Linear: label rejected:1": {
+      "main": [[ { "node": "Linear: transition -> Ready", "type": "main", "index": 0 } ]]
+    },
+    "Linear: transition -> Ready": {
+      "main": [[ { "node": "Linear: commentaire retry direct", "type": "main", "index": 0 } ]]
+    },
+    "Linear: retirer agent:ok": {
+      "main": [[ { "node": "Linear: retirer rejected:1", "type": "main", "index": 0 } ]]
+    },
+    "Linear: retirer rejected:1": {
+      "main": [[ { "node": "Linear: transition -> Triage", "type": "main", "index": 0 } ]]
+    },
+    "Linear: transition -> Triage": {
+      "main": [[ { "node": "Linear: commentaire reformulation requise", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "tags": []
+}

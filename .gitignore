@@ -1,11 +1,21 @@
 # agent-infra — .gitignore
 
-# Decrypted secrets (from SOPS)
+# Decrypted secrets (from SOPS) — any .env variant, ad hoc or not.
+# Never create a plaintext .env* file outside the sops/deploy.sh decrypt-then-shred
+# pattern (see AGENT.md) — this incident happened because one slipped through.
 .env
+.env.*
+!.env.example
+!.env.template
+!*.enc.env
+.local/
 
 # Age private key (stored OFFLINE only)
 secrets/key.txt
 .age/
+
+# Throwaway scripts (ad hoc fixes, one-off debugging, etc.)
+_*.py
 
 # OS junk
 .DS_Store
@@ -20,3 +30,7 @@ Thumbs.db
 
 # Test artifacts
 /tmp/
+
+# Personal files that occasionally end up in the working tree
+voyage-italie-2026/
+easyjet_confirmation.jpg

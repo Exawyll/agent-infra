@@ -19,14 +19,7 @@ Infrastructure reproductible pour KVM2 (le cerveau) : n8n + Hermes + LiteLLM.
 │  │  LiteLLM    │  ← Routeur de modèles          │
 │  │  (Docker)   │    alias: rapide/code/review   │
 │  └─────────────┘                                │
-│         │ Tailscale                             │
-└─────────┼───────────────────────────────────────┘
-          │
-┌─────────┼───────────────────────────────────────┐
-│  KVM1 — Mains (VPS dev)                         │
-│  Conteneurs éphémères pour exécution du daemon  │
-│  Reçoit les backups n8n quotidiens              │
-└─────────────────────────────────────────────────┘
+└───────────────────────────────────────────────────┘
 ```
 
 ## Prérequis (restore from scratch)
@@ -104,15 +97,11 @@ agent-infra/
 │       ├── install.sh           # Script d'installation reproductible
 │       └── profiles/            # Un service systemd user-level par profil
 │                                 # (hermes gateway install, via deploy.sh hermes)
-├── kvm1/                        # VPS dev (mains)
-│   ├── docker/                  # Conteneurs éphémères
-│   └── agent-daemon/            # Scripts du daemon dev
 ├── n8n-workflows/               # Exports JSON (versionnés pour le diff)
 ├── prompts/                     # Prompts d'agents (versionnés)
 ├── scripts/
 │   ├── deploy.sh                # Déploiement idempotent (n8n|litellm|hermes|all)
 │   ├── restore.sh               # Restauration complète from scratch
-│   ├── backup-n8n-volume.sh     # Backup volume Docker n8n → KVM1
 │   ├── decrypt-secrets.sh       # Déchiffre secrets SOPS
 │   ├── import-workflows.sh      # Import workflows n8n
 │   └── install-hooks.sh         # Installe le hook pre-commit gitleaks

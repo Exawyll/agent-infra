@@ -28,6 +28,14 @@ Triage ──(agent:ok + critères)──▶ Ready ──(claim)──▶ In Pro
 - **Done** — PR mergée.
 - **Rejected** — PR fermée sans merge, ou run en échec après épuisement des essais.
 
+**Phase 2 (implémentation actuelle)** : le board Linear réel de l'équipe `agent-infra` n'a pas ces 6 states —
+seulement Backlog/Todo/In Progress/Done/Duplicate/Canceled (vérifié via l'API le 2026-07-19). Décision : pas de
+nouveaux states créés, remapping direct — Backlog=Triage, Todo=Ready, In Progress et Done inchangés (déjà
+natifs). Pas d'équivalent "In Review" : un ticket reste In Progress jusqu'au merge de sa PR, transition directe
+vers Done à ce moment-là (`symphony-merge-handler`). "Rejected" du diagramme ci-dessus n'est jamais un état de
+repos — c'est la Ready ou la Triage de la règle ci-dessous, atteinte directement, sans étape intermédiaire.
+Config réelle : `LINEAR_STATE_*` dans `kvm2/docker/n8n/.env.template`.
+
 **Règle des rejets** : un ticket rejeté une 1ère fois peut repasser en Ready directement si la raison du rejet
 est mineure. Un ticket rejeté **2 fois consécutives** retourne obligatoirement en **Triage**, avec reformulation
 humaine obligatoire des critères d'acceptation avant de pouvoir redevenir Ready — jamais de 3e essai automatique
@@ -62,6 +70,12 @@ Une PR d'agent qui ne touche aucun test doit le justifier explicitement dans sa 
 - **Timeout** par run — dépassement = kill du conteneur, ticket → Triage, alerte Telegram avec la raison.
 - **Budget par ticket** — dépassement = arrêt immédiat, ticket → Triage, alerte Telegram.
 - Un run sans heartbeat détecté par le watchdog est traité comme un dépassement de timeout.
+- **Phase 2 (statut : exécuteur à refaire)** : le premier exécuteur (`symphony-run-dev.yml`, GitHub Actions)
+  a été supprimé (juillet 2026) — jamais testé de bout en bout, et bâti sur un accès CI→LiteLLM via Tailscale
+  qui n'existe plus. Le dispatcher (`kvm2/n8n/workflows/symphony-dispatcher.json`) et le watchdog
+  (`symphony-watchdog.json`) référencent encore ce nom de workflow et échoueront tant qu'un exécuteur de
+  remplacement n'est pas construit. L'approche heartbeat-par-timeout-global décrite ci-dessus reste le design
+  cible, à ré-implémenter avec le nouvel exécuteur.
 
 ## Garde-fous (doctrine)
 
@@ -93,6 +107,20 @@ Une PR d'agent qui ne touche aucun test doit le justifier explicitement dans sa 
   d'un `restore.sh` sur VPS vierge.
 - **Tester un script d'install sur une machine vraiment vierge** avant de le considérer fiable — des chemins
   disaster-recovery se sont révélés cassés uniquement en testant sur un VPS vierge, jamais en relisant le code.
+
+## Secrets requis (Phase 2)
+
+Deux catégories distinctes, jamais interchangeables :
+
+- **SOPS (`secrets/.env.enc.env`)** — tout secret consommé côté KVM2 (n8n, LiteLLM) : `LINEAR_API_KEY`
+  (écriture — transitions d'état + commentaires, distinct de `LINEAR_WEBHOOK_SECRET` qui ne sert qu'à la
+  vérification HMAC entrante), `LINEAR_TEAM_ID`, `GITHUB_WEBHOOK_SECRET`, `LITELLM_KEY_AGENT_DEV` (clé
+  virtuelle LiteLLM, budget dédié), `LITELLM_MASTER_KEY` (déjà présent).
+- **Secrets/variables GitHub Actions** : aucun actuellement — le seul workflow qui en avait besoin
+  (`symphony-run-dev.yml`) a été supprimé, jamais testé. À redéfinir quand l'exécuteur de remplacement sera
+  construit (cf. section précédente) : prévoir a minima une clé virtuelle LiteLLM scopée dédiée à la CI
+  (jamais la master key) et une URL d'accès. LiteLLM peut être exposé publiquement en HTTPS via Traefik
+  (même pattern que n8n) si besoin — l'auth reste portée par LiteLLM lui-même, pas par un VPN/ACL réseau.
 
 ## À qui fournir les prompts
 

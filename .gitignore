@@ -20,3 +20,14 @@ Thumbs.db
 
 # Test artifacts
 /tmp/
+
+# Temp/env files
+.env.tmp
+.local/
+
+# Throwaway scripts (Notion ad-hoc fixes, etc.)
+_*.py
+
+# Personal files
+easyjet_confirmation.jpg
+voyage-italie-2026/

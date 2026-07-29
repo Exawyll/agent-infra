@@ -68,6 +68,13 @@ write_profile_env() {
   local dst="${hermes_profiles}/${profile}/.env"
   local tmp_env
 
+  # extract_secret() exports SOPS_AGE_KEY_FILE, but it's called below via
+  # $(...) command substitution — that runs in a subshell, so the export
+  # never reaches this function's own shell. Set it here explicitly too,
+  # since the raw `sops --decrypt` call for pro-profile.env.enc.env further
+  # down relies on it directly (not through extract_secret).
+  export SOPS_AGE_KEY_FILE="$HOME/.age/key.txt"
+
   # Build the .env atomically (write to temp, then rename)
   tmp_env=$(mktemp)
   chmod 600 "$tmp_env"

@@ -70,10 +70,12 @@ Une PR d'agent qui ne touche aucun test doit le justifier explicitement dans sa 
 - **Timeout** par run — dépassement = kill du conteneur, ticket → Triage, alerte Telegram avec la raison.
 - **Budget par ticket** — dépassement = arrêt immédiat, ticket → Triage, alerte Telegram.
 - Un run sans heartbeat détecté par le watchdog est traité comme un dépassement de timeout.
-- **Phase 2 (implémentation actuelle)** : l'exécuteur (`symphony-run-dev.yml`, GitHub Actions) n'émet qu'un
-  rapport unique en fin de job — pas de ping périodique intra-run. Le heartbeat est donc approximé par le seul
-  timeout global ci-dessus, pas un mécanisme séparé. À revoir si un vrai besoin de télémétrie intra-run se
-  confirme (ex. runs très longs où un timeout global devient un signal trop tardif).
+- **Phase 2 (statut : exécuteur à refaire)** : le premier exécuteur (`symphony-run-dev.yml`, GitHub Actions)
+  a été supprimé (juillet 2026) — jamais testé de bout en bout, et bâti sur un accès CI→LiteLLM via Tailscale
+  qui n'existe plus. Le dispatcher (`kvm2/n8n/workflows/symphony-dispatcher.json`) et le watchdog
+  (`symphony-watchdog.json`) référencent encore ce nom de workflow et échoueront tant qu'un exécuteur de
+  remplacement n'est pas construit. L'approche heartbeat-par-timeout-global décrite ci-dessus reste le design
+  cible, à ré-implémenter avec le nouvel exécuteur.
 
 ## Garde-fous (doctrine)
 
@@ -113,18 +115,12 @@ Deux catégories distinctes, jamais interchangeables :
 - **SOPS (`secrets/.env.enc.env`)** — tout secret consommé côté KVM2 (n8n, LiteLLM) : `LINEAR_API_KEY`
   (écriture — transitions d'état + commentaires, distinct de `LINEAR_WEBHOOK_SECRET` qui ne sert qu'à la
   vérification HMAC entrante), `LINEAR_TEAM_ID`, `GITHUB_WEBHOOK_SECRET`, `LITELLM_KEY_AGENT_DEV` (clé
-  virtuelle LiteLLM, budget dédié — même valeur que `LITELLM_AGENT_DEV_KEY` côté GitHub Actions, deux noms
-  pour le même secret selon le système), `LITELLM_MASTER_KEY` (déjà présent).
-- **Secrets GitHub Actions (repo `agent-infra`, Settings → Secrets)** — jamais dans SOPS, le runner CI n'a pas
-  accès au vault : `LITELLM_AGENT_DEV_KEY` (même clé virtuelle que `LITELLM_KEY_AGENT_DEV` côté SOPS — c'est
-  elle qui route le run vers LiteLLM, jamais une clé Anthropic directe, ni la master key), `RUN_DEV_REPORT_SECRET`
-  (HMAC du rapport `run-dev` → n8n), `N8N_RUN_DEV_REPORT_URL`. `GITHUB_TOKEN` est fourni nativement par
-  GitHub Actions, pas à créer.
-- **Variable GitHub Actions (repo `agent-infra`, Settings → Secrets and variables → Actions → *Variables*,
-  pas Secrets)** — `LITELLM_PUBLIC_URL` (ex. `https://litellm.srv1787569.hstgr.cloud`) : pas sensible (une
-  URL publique, pas un secret), l'accès reste protégé par `LITELLM_AGENT_DEV_KEY`. Tailscale a été
-  décommissionné sur KVM2 (juillet 2026) — LiteLLM est désormais exposé en HTTPS via Traefik comme n8n,
-  plus de VPN/ACL à maintenir pour la CI.
+  virtuelle LiteLLM, budget dédié), `LITELLM_MASTER_KEY` (déjà présent).
+- **Secrets/variables GitHub Actions** : aucun actuellement — le seul workflow qui en avait besoin
+  (`symphony-run-dev.yml`) a été supprimé, jamais testé. À redéfinir quand l'exécuteur de remplacement sera
+  construit (cf. section précédente) : prévoir a minima une clé virtuelle LiteLLM scopée dédiée à la CI
+  (jamais la master key) et une URL d'accès. LiteLLM peut être exposé publiquement en HTTPS via Traefik
+  (même pattern que n8n) si besoin — l'auth reste portée par LiteLLM lui-même, pas par un VPN/ACL réseau.
 
 ## À qui fournir les prompts
 

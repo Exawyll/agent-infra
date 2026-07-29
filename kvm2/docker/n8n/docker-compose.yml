@@ -28,13 +28,6 @@ services:
     restart: always
     ports:
       - "127.0.0.1:4000:4000"
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.litellm.rule=Host(`litellm.${DOMAIN_NAME}`)
-      - traefik.http.routers.litellm.tls=true
-      - traefik.http.routers.litellm.entrypoints=web,websecure
-      - traefik.http.routers.litellm.tls.certresolver=mytlschallenge
-      - traefik.http.services.litellm.loadbalancer.server.port=4000
     environment:
       - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD}@litellm-postgres:5432/litellm
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}

@@ -40,10 +40,11 @@ jobs:
       TICKET_IDENTIFIER: ${{ github.event.inputs.ticket_identifier }}
       TICKET_TITLE: ${{ github.event.inputs.title }}
       # Repository *variable* (Settings → Secrets and variables → Actions → Variables),
-      # pas un secret — c'est une IP Tailscale, pas une donnée sensible. À garder en
-      # phase avec TAILSCALE_KVM2_IP côté kvm2/docker/n8n/.env.template si KVM2 change
-      # d'IP Tailscale (cf. review PR #13). Valeur actuelle : http://100.106.174.46:4000
-      LITELLM_URL: ${{ vars.LITELLM_TAILSCALE_URL }}
+      # pas un secret — c'est une URL publique, pas une donnée sensible (l'accès est
+      # protégé par LITELLM_AGENT_DEV_KEY, une clé virtuelle scopée, jamais la master
+      # key). Tailscale a été décommissionné sur KVM2 (juillet 2026) ; LiteLLM est
+      # exposé en HTTPS via Traefik comme n8n. Valeur actuelle : https://litellm.srv1787569.hstgr.cloud
+      LITELLM_URL: ${{ vars.LITELLM_PUBLIC_URL }}
       ACCEPTANCE_CRITERIA: ${{ github.event.inputs.acceptance_criteria }}
       ATTEMPT: ${{ github.event.inputs.attempt }}
       BRANCH_NAME: feat/${{ github.event.inputs.ticket_identifier }}-symphony-run
@@ -59,18 +60,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Join tailnet (ephemeral, tag:ci)
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          version: latest
-
-      - name: Sanity check — LiteLLM reachable over tailnet
+      - name: Sanity check — LiteLLM reachable
         run: |
           curl -sf --max-time 10 "$LITELLM_URL/health" \
-            || { echo "::error::LiteLLM unreachable over Tailscale — check ACL tag:ci (kvm2/tailscale/acl-tag-ci.md) before assuming an agent failure."; exit 1; }
+            || { echo "::error::LiteLLM unreachable — check Traefik/DNS for litellm.\${DOMAIN_NAME} before assuming an agent failure."; exit 1; }
 
       - name: Checkout or create ticket branch
         run: |

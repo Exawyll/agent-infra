@@ -112,18 +112,19 @@ Deux catégories distinctes, jamais interchangeables :
 
 - **SOPS (`secrets/.env.enc.env`)** — tout secret consommé côté KVM2 (n8n, LiteLLM) : `LINEAR_API_KEY`
   (écriture — transitions d'état + commentaires, distinct de `LINEAR_WEBHOOK_SECRET` qui ne sert qu'à la
-  vérification HMAC entrante), `LINEAR_TEAM_ID`, `GITHUB_WEBHOOK_SECRET`, `LITELLM_AGENT_DEV_KEY` (clé
-  virtuelle LiteLLM, budget dédié), `LITELLM_MASTER_KEY` (déjà présent), `TAILSCALE_KVM2_IP` (pas un secret à
-  proprement parler, mais versionné ici pour binder LiteLLM côté `docker-compose.yml`).
+  vérification HMAC entrante), `LINEAR_TEAM_ID`, `GITHUB_WEBHOOK_SECRET`, `LITELLM_KEY_AGENT_DEV` (clé
+  virtuelle LiteLLM, budget dédié — même valeur que `LITELLM_AGENT_DEV_KEY` côté GitHub Actions, deux noms
+  pour le même secret selon le système), `LITELLM_MASTER_KEY` (déjà présent).
 - **Secrets GitHub Actions (repo `agent-infra`, Settings → Secrets)** — jamais dans SOPS, le runner CI n'a pas
-  accès au vault : `TS_OAUTH_CLIENT_ID` / `TS_OAUTH_SECRET` (Tailscale, scopés `tag:ci`), `LITELLM_AGENT_DEV_KEY`
-  (même clé virtuelle que côté SOPS — c'est elle qui route le run vers LiteLLM, jamais une clé Anthropic
-  directe), `RUN_DEV_REPORT_SECRET` (HMAC du rapport `run-dev` → n8n), `N8N_RUN_DEV_REPORT_URL`. `GITHUB_TOKEN`
-  est fourni nativement par GitHub Actions, pas à créer.
+  accès au vault : `LITELLM_AGENT_DEV_KEY` (même clé virtuelle que `LITELLM_KEY_AGENT_DEV` côté SOPS — c'est
+  elle qui route le run vers LiteLLM, jamais une clé Anthropic directe, ni la master key), `RUN_DEV_REPORT_SECRET`
+  (HMAC du rapport `run-dev` → n8n), `N8N_RUN_DEV_REPORT_URL`. `GITHUB_TOKEN` est fourni nativement par
+  GitHub Actions, pas à créer.
 - **Variable GitHub Actions (repo `agent-infra`, Settings → Secrets and variables → Actions → *Variables*,
-  pas Secrets)** — `LITELLM_TAILSCALE_URL` (ex. `http://100.106.174.46:4000`) : pas sensible (juste une IP
-  Tailscale), mais doit rester synchronisée avec `TAILSCALE_KVM2_IP` côté SOPS si KVM2 change d'IP un jour
-  (suggestion de review PR #13, pour éviter l'IP en dur dans 3 fichiers différents).
+  pas Secrets)** — `LITELLM_PUBLIC_URL` (ex. `https://litellm.srv1787569.hstgr.cloud`) : pas sensible (une
+  URL publique, pas un secret), l'accès reste protégé par `LITELLM_AGENT_DEV_KEY`. Tailscale a été
+  décommissionné sur KVM2 (juillet 2026) — LiteLLM est désormais exposé en HTTPS via Traefik comme n8n,
+  plus de VPN/ACL à maintenir pour la CI.
 
 ## À qui fournir les prompts
 

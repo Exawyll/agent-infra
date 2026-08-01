@@ -1,5 +1,5 @@
 #!/bin/bash
-# import-workflows.sh — Importe tous les workflows n8n depuis n8n-workflows/
+# import-workflows.sh — Importe tous les workflows n8n depuis n8n/workflows/
 # Usage: ./import-workflows.sh [workflow-dir]
 set -euo pipefail
 

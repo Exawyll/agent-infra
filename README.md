@@ -97,7 +97,7 @@ agent-infra/
 │       ├── install.sh           # Script d'installation reproductible
 │       └── profiles/            # Un service systemd user-level par profil
 │                                 # (hermes gateway install, via deploy.sh hermes)
-├── n8n-workflows/               # Exports JSON (versionnés pour le diff)
+├── n8n/workflows/               # Exports JSON (versionnés pour le diff)
 ├── prompts/                     # Prompts d'agents (versionnés)
 ├── scripts/
 │   ├── deploy.sh                # Déploiement idempotent (n8n|litellm|hermes|all)

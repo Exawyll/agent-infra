@@ -1,21 +1,13 @@
 {
-  "updatedAt": "2026-07-18T08:56:57.166Z",
-  "createdAt": "2026-07-16T20:27:25.924Z",
-  "id": "O0w8hwJBkJaU22Q9",
   "name": "trigger-actus-positives",
-  "description": null,
   "active": true,
-  "isArchived": false,
   "nodes": [
     {
       "id": "schedule-1",
       "name": "Schedule 6h UTC",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
-      "position": [
-        0,
-        0
-      ],
+      "position": [0, 0],
       "parameters": {
         "rule": {
           "interval": [
@@ -28,24 +20,43 @@
       }
     },
     {
+      "id": "read-file-1",
+      "name": "Read dedup log",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [300, 0],
+      "parameters": {
+        "fileOperation": "read",
+        "fileSelector": "/files/factfulness_log.json"
+      }
+    },
+    {
+      "id": "parse-dedup-1",
+      "name": "Parse dedup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 0],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "try {\n  const fileData = $input.first().json.data;\n  const entries = fileData ? (JSON.parse(fileData).entries || []) : [];\n  return [{ json: { dedup_log: entries } }];\n} catch(e) {\n  return [{ json: { dedup_log: [] } }];\n}"
+      }
+    },
+    {
       "id": "http-1",
       "name": "POST factfulness webhook",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        300,
-        0
-      ],
+      "position": [900, 0],
       "parameters": {
         "method": "POST",
-        "url": "http://100.106.174.46:8644/webhooks/factfulness-daily",
+        "url": "http://172.18.0.1:8644/webhooks/factfulness-daily",
         "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "X-Hub-Signature-256",
-              "value": "={{ $env.HERMES_WEBHOOK_SIGNATURE }}"
+              "value": "sha256=e4667738708d04e8bc0fe88f03b58ae992a38cb2c744b2c02070ab85d925e312"
             },
             {
               "name": "Content-Type",
@@ -55,7 +66,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{}",
+        "jsonBody": "{\n  \"dedup_log\": {{ JSON.stringify($json.dedup_log) }}\n}",
         "options": {
           "continueOnFail": true
         }
@@ -66,10 +77,7 @@
       "name": "Erreur ?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [
-        600,
-        0
-      ],
+      "position": [1200, 0],
       "parameters": {
         "conditions": {
           "options": {
@@ -100,27 +108,39 @@
       "name": "Alerte Telegram",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 2,
-      "position": [
-        900,
-        100
-      ],
+      "position": [1500, 100],
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
         "chatId": "8262789577",
         "text": "=🚨 *ÉCHEC — Actus Positives*\n\nLe webhook Hermes `factfulness-daily` n'a pas répondu.\n\n- Statut HTTP : `{{ $json.statusCode }}`\n- Erreur : {{ $json.error || 'pas de détail' }}\n- Horodatage : {{ $now }}"
-      },
-      "credentials": {
-        "telegramApi": {
-          "id": "ihZuIM3ZQcKsWsu9",
-          "name": "Telegram account"
-        }
-      },
-      "webhookId": "ac45b9bd-8ee4-4937-8ec9-7ba20087968e"
+      }
     }
   ],
   "connections": {
     "Schedule 6h UTC": {
+      "main": [
+        [
+          {
+            "node": "Read dedup log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read dedup log": {
+      "main": [
+        [
+          {
+            "node": "Parse dedup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse dedup": {
       "main": [
         [
           {
@@ -157,48 +177,5 @@
   },
   "settings": {
     "executionOrder": "v1"
-  },
-  "staticData": {
-    "node:Schedule 6h UTC": {
-      "recurrenceRules": [
-        null
-      ],
-      "recurrenceRuleSignatures": [
-        null
-      ]
-    }
-  },
-  "meta": null,
-  "nodeGroups": [],
-  "pinData": null,
-  "versionId": "02481ed6-414d-4d7b-a00f-6ce5d852084c",
-  "activeVersionId": "02481ed6-414d-4d7b-a00f-6ce5d852084c",
-  "versionCounter": 2,
-  "triggerCount": 1,
-  "sourceWorkflowId": null,
-  "tags": [],
-  "shared": [
-    {
-      "updatedAt": "2026-07-16T20:27:25.934Z",
-      "createdAt": "2026-07-16T20:27:25.934Z",
-      "role": "workflow:owner",
-      "workflowId": "O0w8hwJBkJaU22Q9",
-      "projectId": "sNNrSsaIZrZEIzbV",
-      "project": {
-        "updatedAt": "2025-08-17T10:23:29.036Z",
-        "createdAt": "2025-08-17T10:13:04.274Z",
-        "id": "sNNrSsaIZrZEIzbV",
-        "name": "Wylliam Delaunay <wylliam.delaunay@gmail.com>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "customTelemetryTags": [],
-        "creatorId": "888b242b-51c8-4278-a1a4-f8c774a120dc"
-      }
-    }
-  ],
-  "versionMetadata": {
-    "name": null,
-    "description": null
   }
 }

@@ -5,7 +5,11 @@
 model:
   default: code
   provider: custom
-  base_url: http://127.0.0.1:4000/v1
+  # Ce profil ne tourne jamais sur l'hôte (contrairement aux autres profils
+  # Hermes) : il vit exclusivement dans le conteneur symphony-executor, donc
+  # 127.0.0.1 pointerait vers lui-même et non vers LiteLLM. Nom du service
+  # docker-compose du réseau n8n_default.
+  base_url: http://litellm:4000/v1
   api_key: PLACEHOLDER_REPLACE_LOCALLY
   api_mode: chat_completions
 

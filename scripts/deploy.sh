@@ -190,10 +190,14 @@ write_profile_env() {
       gh_token=$(extract_secret "GH_TOKEN")
       [ -n "$gh_token" ] && echo "GH_TOKEN=${gh_token}" >> "$tmp_env"
 
+      local executor_secret
+      executor_secret=$(extract_secret "SYMPHONY_EXECUTOR_SECRET")
+      [ -n "$executor_secret" ] && echo "SYMPHONY_EXECUTOR_SECRET=${executor_secret}" >> "$tmp_env"
+
       local notion_key
       notion_key=$(extract_secret "NOTION_API_KEY")
       [ -n "$notion_key" ] && echo "NOTION_API_KEY=${notion_key}" >> "$tmp_env"
-      
+
       # Also add Anthropic and OpenAI keys if needed
       local anthropic_key
       anthropic_key=$(extract_secret "ANTHROPIC_API_KEY")

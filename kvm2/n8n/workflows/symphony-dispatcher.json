@@ -187,7 +187,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Symphony-Secret", "value": "={{ $env.SYMPHONY_EXECUTOR_SECRET }}" }
           ]
         },
         "sendBody": true,

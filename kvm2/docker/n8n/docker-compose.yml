@@ -103,6 +103,7 @@ services:
       - LINEAR_STATE_IN_PROGRESS=${LINEAR_STATE_IN_PROGRESS}
       - LINEAR_TYPE_LABELS=${LINEAR_TYPE_LABELS}
       - SYMPHONY_TICKET_SECRET=${SYMPHONY_TICKET_SECRET}
+      - SYMPHONY_EXECUTOR_SECRET=${SYMPHONY_EXECUTOR_SECRET}
     volumes:
       - n8n_data:/home/node/.n8n
       - /local-files:/files
@@ -117,11 +118,17 @@ services:
       - ${HOME}/.hermes/profiles/worker/.env
     environment:
       - LITELLM_BASE_URL=http://litellm:4000/v1/chat/completions
+      - SYMPHONY_EXECUTOR_SECRET=${SYMPHONY_EXECUTOR_SECRET}
     volumes:
-      - ../../../:/root/agent-infra
-      - ~/.hermes:/root/.hermes
+      # Dedicated clone (managed by symphony-executor.py itself), never a bind
+      # mount of the host's live ops checkout: the worker runs LLM-generated
+      # code with a terminal toolset, so its blast radius must stay inside a
+      # sandbox the executor owns, not the same tree deploy.sh/humans use.
+      - symphony_repo_data:/root/agent-infra
+      # Only the worker's own profile — NOT the whole ~/.hermes tree, which
+      # also holds the veille/dev/assistant/pro profiles' virtual keys.
+      - ${HOME}/.hermes/profiles/worker:/root/.hermes/profiles/worker
       - /usr/local/bin/hermes:/usr/local/bin/hermes:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     working_dir: /root/agent-infra
 
 networks:
@@ -137,3 +144,4 @@ volumes:
     name: n8n_data
   litellm_configs:
   litellm_postgres_data:
+  symphony_repo_data:

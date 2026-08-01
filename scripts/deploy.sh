@@ -233,7 +233,14 @@ deploy_hermes() {
 
       [ ! -f "$src_config" ] && continue
 
-      # Preserve existing api_key (per-machine) before overwriting
+      # Resolve the correct LiteLLM virtual key from SOPS when available —
+      # the SOPS store (secrets/.env.enc.env) is the source of truth.
+      # Fall back to preserving the existing local key ONLY if it looks like
+      # a real key (sk- prefix). A stale/non-key value (e.g. a key hash or a
+      # revoked key) must NOT be frozen into the deployed config.
+      local sops_key
+      sops_key=$(extract_secret "LITELLM_KEY_AGENT_${profile_name^^}")
+
       local existing_key=""
       if [ -f "$dst_config" ]; then
         existing_key=$(python3 -c "
@@ -248,19 +255,32 @@ sys.stdout.write(key if key and key != 'PLACEHOLDER_REPLACE_LOCALLY' else '')
       mkdir -p "$(dirname "$dst_config")"
       cp "$src_config" "$dst_config"
 
-      # Restore api_key placeholder if we had a real key (Python YAML round-trip — safe)
-      if [ -n "$existing_key" ]; then
+      # Key precedence: SOPS (source of truth) > preserved local key (sk-* only) > placeholder
+      local final_key=""
+      if [ -n "$sops_key" ]; then
+        final_key="$sops_key"
+      elif [ -n "$existing_key" ] && [[ "$existing_key" == sk-* ]]; then
+        final_key="$existing_key"
+      fi
+
+      if [ -n "$final_key" ]; then
+        # Textual injection preserves template comments/format (no YAML round-trip)
         python3 -c "
-import yaml
+import sys
+secret = sys.argv[1]
 with open('$dst_config') as f:
-    cfg = yaml.safe_load(f)
-cfg['model']['api_key'] = '$existing_key'
+    content = f.read()
+content = content.replace('PLACEHOLDER_REPLACE_LOCALLY', secret)
 with open('$dst_config', 'w') as f:
-    yaml.safe_dump(cfg, f, default_flow_style=False, allow_unicode=True)
-" 2>/dev/null
-        echo "  🔑 ${profile_name}/config.yaml: api_key preserved"
+    f.write(content)
+" "$final_key" 2>/dev/null
+        if [ -n "$sops_key" ]; then
+          echo "  🔑 ${profile_name}/config.yaml: api_key from SOPS (LITELLM_KEY_AGENT_${profile_name^^})"
+        else
+          echo "  🔑 ${profile_name}/config.yaml: api_key preserved (sk-* only)"
+        fi
       else
-        echo "  📄 ${profile_name}/config.yaml: created from repo template"
+        echo "  📄 ${profile_name}/config.yaml: created from repo template (PLACEHOLDER_REPLACE_LOCALLY)"
       fi
 
       if [ -n "$webhook_secret" ] && grep -q "PLACEHOLDER_WEBHOOK_SECRET_SOPS" "$dst_config" 2>/dev/null; then

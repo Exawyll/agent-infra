@@ -84,7 +84,7 @@ echo "✅ Deployment complete"
 
 # 6. Importer les workflows n8n
 echo "📋 Importing n8n workflows..."
-for wf in n8n-workflows/*.json; do
+for wf in n8n/workflows/*.json; do
   [ -f "$wf" ] || continue
   echo "  Importing $(basename "$wf")..."
   curl -s -X POST "http://localhost:5678/api/v1/workflows" \

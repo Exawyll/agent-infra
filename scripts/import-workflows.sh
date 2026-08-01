@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-WORKFLOW_DIR="${1:-${REPO_ROOT}/n8n-workflows}"
+WORKFLOW_DIR="${1:-${REPO_ROOT}/n8n/workflows}"
 N8N_URL="${N8N_URL:-http://localhost:5678}"
 COUNT=0
 

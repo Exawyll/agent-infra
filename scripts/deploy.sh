@@ -173,6 +173,40 @@ write_profile_env() {
         echo "  🗂️  ${profile}/.env: pro-specific vars from SOPS" >&2
       fi
       ;;
+    worker)
+      local lk_worker
+      lk_worker=$(extract_secret "LITELLM_KEY_AGENT_WORKER")
+      [ -n "$lk_worker" ] && echo "LITELLM_KEY_AGENT_WORKER=${lk_worker}" >> "$tmp_env"
+
+      local lk_review_b
+      lk_review_b=$(extract_secret "LITELLM_KEY_AGENT_REVIEW_B")
+      [ -n "$lk_review_b" ] && echo "LITELLM_KEY_AGENT_REVIEW_B=${lk_review_b}" >> "$tmp_env"
+
+      local or_key
+      or_key=$(extract_secret "OPENROUTER_API_KEY")
+      [ -n "$or_key" ] && echo "OPENROUTER_API_KEY=${or_key}" >> "$tmp_env"
+      
+      local gh_token
+      gh_token=$(extract_secret "GH_TOKEN")
+      [ -n "$gh_token" ] && echo "GH_TOKEN=${gh_token}" >> "$tmp_env"
+
+      local executor_secret
+      executor_secret=$(extract_secret "SYMPHONY_EXECUTOR_SECRET")
+      [ -n "$executor_secret" ] && echo "SYMPHONY_EXECUTOR_SECRET=${executor_secret}" >> "$tmp_env"
+
+      local notion_key
+      notion_key=$(extract_secret "NOTION_API_KEY")
+      [ -n "$notion_key" ] && echo "NOTION_API_KEY=${notion_key}" >> "$tmp_env"
+
+      # Also add Anthropic and OpenAI keys if needed
+      local anthropic_key
+      anthropic_key=$(extract_secret "ANTHROPIC_API_KEY")
+      [ -n "$anthropic_key" ] && echo "ANTHROPIC_API_KEY=${anthropic_key}" >> "$tmp_env"
+      
+      local openai_key
+      openai_key=$(extract_secret "OPENAI_API_KEY")
+      [ -n "$openai_key" ] && echo "OPENAI_API_KEY=${openai_key}" >> "$tmp_env"
+      ;;
   esac
 
   # Replace existing .env if we wrote something

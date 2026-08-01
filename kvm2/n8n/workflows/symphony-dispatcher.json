@@ -176,23 +176,27 @@
     },
     {
       "id": "http-dispatch-1",
-      "name": "GitHub: workflow_dispatch run-dev",
+      "name": "Symphony Executor: POST /execute",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [2200, 110],
+      "notes": "Phase 3 : remplace l'ancien workflow_dispatch GitHub Actions (symphony-run-dev.yml n'a jamais existé dans le repo). Appelle directement le conteneur symphony-executor via le réseau Docker n8n_default. ticket_id = identifiant Linear lisible (ex. RALPH-42), utilisé par l'exécuteur pour nommer la branche et la PR.",
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.github.com/repos/' + $('Config repo cible').first().json.repoMap['agent-infra'].owner + '/' + $('Config repo cible').first().json.repoMap['agent-infra'].repo + '/actions/workflows/' + $('Config repo cible').first().json.repoMap['agent-infra'].workflowFile + '/dispatches' }}",
+        "url": "http://symphony-executor:5000/execute",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env.GITHUB_TOKEN }}" },
-            { "name": "Accept", "value": "application/vnd.github+json" }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Symphony-Secret", "value": "={{ $env.SYMPHONY_EXECUTOR_SECRET }}" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ ref: 'main', inputs: { ticket_id: $('Préparer label attempt:1').first().json.ticket.id, ticket_identifier: $('Préparer label attempt:1').first().json.ticket.identifier, title: $('Préparer label attempt:1').first().json.ticket.title, acceptance_criteria: $('Préparer label attempt:1').first().json.ticket.description, repo: 'Exawyll/agent-infra', attempt: String($('Préparer label attempt:1').first().json.attempt) } }) }}"
+        "jsonBody": "={{ JSON.stringify({ ticket_id: $('Préparer label attempt:1').first().json.ticket.identifier, description: $('Préparer label attempt:1').first().json.ticket.description }) }}",
+        "options": {
+          "timeout": 5000
+        }
       }
     }
   ],

@@ -1,0 +1,121 @@
+{
+  "id": "symphonyCreateTicket01",
+  "name": "symphony-create-ticket",
+  "description": "Phase 3 Symphony : webhook appelé par le profil Hermes dev (skill create-symphony-ticket) pour créer un ticket Linear éligible (agent:ok) que symphony-dispatcher ramassera au prochain cron. Protégé par un secret partagé (header X-Symphony-Secret) — sans lui, n'importe qui peut faire exécuter du code sur le repo.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "webhook-create-ticket-1",
+      "name": "Webhook symphony-create-ticket",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "symphony-create-ticket",
+        "authentication": "none",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "webhookId": "symphony-create-ticket"
+    },
+    {
+      "id": "code-verify-secret-1",
+      "name": "Vérifier secret + valider payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "parameters": {
+        "jsCode": "// Ce webhook est exposé publiquement via Traefik. Un ticket créé ici est\n// automatiquement ramassé par symphony-dispatcher (label agent:ok) puis exécuté\n// avec accès push + PR sur le repo — donc pas de secret = exécution de code\n// arbitraire par n'importe qui trouvant l'URL. D'où la vérification ici, avant\n// même de parler à Linear.\nconst crypto = require('crypto');\n\nconst secret = $env.SYMPHONY_TICKET_SECRET;\nif (!secret) {\n  throw new Error('SYMPHONY_TICKET_SECRET manquant dans l\\'environnement n8n');\n}\n\nconst item = $input.first().json;\nconst headerSecret = (item.headers && item.headers['x-symphony-secret']) || '';\n\nconst expectedBuf = Buffer.from(secret, 'utf8');\nconst receivedBuf = Buffer.from(String(headerSecret), 'utf8');\nconst valid = expectedBuf.length === receivedBuf.length && crypto.timingSafeEqual(expectedBuf, receivedBuf);\n\nif (!valid) {\n  throw new Error('Secret invalide — requête rejetée');\n}\n\nconst body = item.body || {};\nconst { title, description, labels } = body;\n\nif (!title || !description) {\n  throw new Error('Payload invalide — title et description sont obligatoires');\n}\n\nreturn [{\n  json: {\n    title,\n    description,\n    labels: Array.isArray(labels) && labels.length ? labels : ['agent:ok']\n  }\n}];"
+      }
+    },
+    {
+      "id": "http-resolve-team-1",
+      "name": "Linear: resolve states + labels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: `query { team(id: \\\"${$env.LINEAR_TEAM_ID}\\\") { states { nodes { id name } } labels { nodes { id name } } } }` }) }}"
+      }
+    },
+    {
+      "id": "code-build-mutation-1",
+      "name": "Construire mutation issueCreate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0],
+      "parameters": {
+        "jsCode": "// Même logique de résolution par nom que symphony-dispatcher (jamais d'ID\n// Linear en dur) : le ticket doit atterrir directement dans l'état \"Ready\"\n// (LINEAR_STATE_READY) pour que le dispatcher le ramasse au prochain cron.\nconst payload = $('Vérifier secret + valider payload').first().json;\nconst resolved = $input.first().json;\n\nconst states = (resolved.data && resolved.data.team && resolved.data.team.states.nodes) || [];\nconst labelNodes = (resolved.data && resolved.data.team && resolved.data.team.labels.nodes) || [];\n\nconst wantedState = $env.LINEAR_STATE_READY || 'Ready';\nconst targetState = states.find((s) => s.name === wantedState);\nif (!targetState) {\n  throw new Error(`State \"${wantedState}\" introuvable sur l'équipe Linear.`);\n}\n\nconst labelIds = payload.labels\n  .map((name) => { const l = labelNodes.find((n) => n.name === name); return l ? l.id : null; })\n  .filter(Boolean);\n\nif (labelIds.length === 0) {\n  throw new Error(`Aucun des labels demandés (${payload.labels.join(', ')}) n'existe sur le board Linear.`);\n}\n\nreturn [{\n  json: {\n    title: payload.title,\n    description: payload.description,\n    stateId: targetState.id,\n    labelIds\n  }\n}];"
+      }
+    },
+    {
+      "id": "http-issue-create-1",
+      "name": "Linear: issueCreate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $env.LINEAR_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation IssueCreate($teamId: String!, $title: String!, $description: String!, $stateId: String!, $labelIds: [String!]) { issueCreate(input: { teamId: $teamId, title: $title, description: $description, stateId: $stateId, labelIds: $labelIds }) { success issue { id identifier url } } }', variables: { teamId: $env.LINEAR_TEAM_ID, title: $json.title, description: $json.description, stateId: $json.stateId, labelIds: $json.labelIds } }) }}"
+      }
+    },
+    {
+      "id": "code-response-1",
+      "name": "Réponse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 0],
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst issue = resp.data && resp.data.issueCreate && resp.data.issueCreate.issue;\nif (!issue) {\n  throw new Error('issueCreate a échoué : ' + JSON.stringify(resp));\n}\nreturn [{ json: { success: true, identifier: issue.identifier, url: issue.url } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook symphony-create-ticket": {
+      "main": [[ { "node": "Vérifier secret + valider payload", "type": "main", "index": 0 } ]]
+    },
+    "Vérifier secret + valider payload": {
+      "main": [[ { "node": "Linear: resolve states + labels", "type": "main", "index": 0 } ]]
+    },
+    "Linear: resolve states + labels": {
+      "main": [[ { "node": "Construire mutation issueCreate", "type": "main", "index": 0 } ]]
+    },
+    "Construire mutation issueCreate": {
+      "main": [[ { "node": "Linear: issueCreate", "type": "main", "index": 0 } ]]
+    },
+    "Linear: issueCreate": {
+      "main": [[ { "node": "Réponse", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "tags": []
+}

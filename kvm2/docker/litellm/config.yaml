@@ -2,6 +2,7 @@
 # rapide → V4 Flash (DeepSeek direct)
 # code   → V4 Pro (DeepSeek direct, fallback → rapide)
 # review → GLM-5.2 (OpenRouter — second avis distinct de `code`, remplace Kimi K3 trop lent/cher)
+# review-b → Claude Sonnet 5 (OpenRouter — 2e reviewer Gate 2 Symphony Phase 3, distinct de `review`)
 # raisonnement → V4 Pro (DeepSeek direct)
 
 model_list:
@@ -30,6 +31,16 @@ model_list:
       api_key: os.environ/OPENROUTER_API_KEY
       input_cost_per_token: 0.00000025
       output_cost_per_token: 0.00000079
+
+  # Review B : 2e avis Gate 2 Symphony Phase 3 — Claude Sonnet 5 (OpenRouter),
+  # volontairement un provider/famille différente de `review` (GLM) pour un
+  # vrai second avis indépendant. Pricing OpenRouter au 2026-08 : $2/M in, $10/M out.
+  - model_name: review-b
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-5
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.000002
+      output_cost_per_token: 0.00001
 
   # Raisonnement : planification, architecture — V4 Pro direct
   - model_name: raisonnement

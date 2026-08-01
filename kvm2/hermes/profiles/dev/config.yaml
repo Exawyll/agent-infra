@@ -17,7 +17,7 @@ credential_pool_strategies: {}
 
 toolsets:
   - web
-  - terminal
+  # - terminal (removed for read-only Architect)
   - file
   - delegation
   - skills

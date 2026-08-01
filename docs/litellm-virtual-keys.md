@@ -36,10 +36,13 @@ Chaque maillon doit être cohérent : **SOPS → config.yaml → clé virtuelle 
 | `dev` | `agent-dev` | `code`, `review` | $20/30j | PR review, dev |
 | `assistant` | `agent-assistant` | `rapide`, `raisonnement` | $10/30j | Quotidien |
 | `pro` | `agent-pro` | `rapide`, `raisonnement` | $10/30j | Pro |
+| `worker` | `agent-worker` (env `LITELLM_KEY_AGENT_WORKER`) | `code` | à définir | Symphony Phase 3 — exécution du ticket (git worktree, tests, commit) |
+| — | `agent-review-b` (env `LITELLM_KEY_AGENT_REVIEW_B`) | `review-b` | à définir | Symphony Phase 3 — Gate 2, 2e reviewer indépendant (appelé par `symphony-executor.py`, pas un profil Hermes) |
 
-Alias LiteLLM (config dans `kvm2/docker/litellm/config.yaml`) : `rapide` →
-deepseek-v4-flash, `code`/`raisonnement` → deepseek-v4-pro, `review` → GLM-5.2
-(OpenRouter).
+Alias LiteLLM (config dans `kvm2/docker/litellm/config.yaml` et sa copie
+`kvm2/docker/n8n/litellm-config.yaml`) : `rapide` → deepseek-v4-flash,
+`code`/`raisonnement` → deepseek-v4-pro, `review` → GLM-5.2 (OpenRouter),
+`review-b` → Claude Sonnet 5 (OpenRouter).
 
 ## Symptômes de l'incident (reconnaître)
 

@@ -67,6 +67,41 @@ Avant de modifier une clé, un profil ou LiteLLM : lire **`docs/litellm-virtual-
 - Vérifier le mapping profil ↔ modèles ↔ budget dans la doc avant tout
   `/key/update` ou `/key/generate`.
 
+## Règle n°9 — jamais de réparation improvisée sur `~/.age/`, `secrets/`, ou une clé de credentials
+
+Né d'un incident du 2026-08-01 : un agent (profil `dev`) a tenté de "réparer" un
+problème n8n/chiffrement en éditant à la main `~/.age/key.txt` (nano), a laissé
+tourner `./scripts/deploy.sh` malgré un déchiffrement raté (silencieux à
+l'époque — bug corrigé depuis), produisant une cascade de credentials vides,
+puis a réinjecté une clé de chiffrement n8n générée/observée au runtime dans
+`secrets/.env.enc.env`, aggravant la corruption.
+
+1. **Ne jamais éditer à la main** `~/.age/key.txt` (ni aucun fichier sous
+   `~/.age/` ou `secrets/`) pour "réparer" quoi que ce soit. Le seul flux
+   légitime de peuplement de `~/.age/key.txt` est un `cp` depuis une source
+   externe hors-ligne vérifiée (password manager, USB, papier) — voir
+   `scripts/restore.sh`. Si ce fichier semble absent, corrompu, ou faux : STOP,
+   ne pas générer ni retaper une clé — escalader à l'humain.
+2. Si `sops --decrypt`/`sops --encrypt` échoue, produit une sortie vide, ou un
+   contenu qui a l'air anormal (mauvais nombre de clés, blob JSON au lieu de
+   `clé=valeur`, etc.) : **STOP immédiatement**, ne pas retenter en boucle, ne
+   pas "continuer quand même" avec `deploy.sh` ou un autre script — escalader
+   à l'humain avec le message d'erreur exact. Un échec de déchiffrement n'est
+   jamais un problème à corriger soi-même sur les fichiers sources.
+3. **Ne jamais écrire dans `secrets/.env.enc.env` une valeur de secret
+   observée ou générée au runtime** ("ce que l'appli utilise actuellement",
+   une clé auto-générée trouvée dans un volume Docker, un fichier de config,
+   un log, etc.). Une valeur qui entre dans SOPS doit venir d'une source
+   connue-bonne et vérifiée : un backup, un password manager, ou une valeur
+   explicitement fournie par l'humain. Si la seule clé disponible est "celle
+   que l'app a l'air d'utiliser", c'est un signal pour escalader — pas pour
+   la sauvegarder.
+4. Cette règle s'applique à **tout agent**, y compris ceux qui ont un accès
+   terminal complet au repo (profil `dev` de Hermes) — voir `SPEC.md`
+   §"Garde-fous (doctrine)" : secrets SOPS et actions humaines ne se
+   délèguent jamais à un agent, même en réponse à une demande explicite de
+   le faire.
+
 ## Notes API LiteLLM (v1.55.0, si rotation de clés virtuelles)
 
 - `/key/delete` peut répondre `500 Internal Server Error` ("tokens that don't belong to user: None") tout en supprimant réellement la ligne en base — vérifier l'effet réel (`curl .../v1/models` avec l'ancienne clé doit renvoyer 401) plutôt que de se fier au code retour.

@@ -70,12 +70,20 @@ Une PR d'agent qui ne touche aucun test doit le justifier explicitement dans sa 
 - **Timeout** par run — dépassement = kill du conteneur, ticket → Triage, alerte Telegram avec la raison.
 - **Budget par ticket** — dépassement = arrêt immédiat, ticket → Triage, alerte Telegram.
 - Un run sans heartbeat détecté par le watchdog est traité comme un dépassement de timeout.
-- **Phase 2 (statut : exécuteur à refaire)** : le premier exécuteur (`symphony-run-dev.yml`, GitHub Actions)
-  a été supprimé (juillet 2026) — jamais testé de bout en bout, et bâti sur un accès CI→LiteLLM via Tailscale
-  qui n'existe plus. Le dispatcher (`kvm2/n8n/workflows/symphony-dispatcher.json`) et le watchdog
-  (`symphony-watchdog.json`) référencent encore ce nom de workflow et échoueront tant qu'un exécuteur de
-  remplacement n'est pas construit. L'approche heartbeat-par-timeout-global décrite ci-dessus reste le design
-  cible, à ré-implémenter avec le nouvel exécuteur.
+- **Phase 3 (implémentation actuelle, testée de bout en bout le 2026-08-01)** : l'exécuteur GitHub Actions
+  (`symphony-run-dev.yml`) a été abandonné (jamais construit) au profit d'un conteneur HTTP toujours actif,
+  `symphony-executor` (`scripts/symphony-executor.py`, service Docker dans `kvm2/docker/n8n/docker-compose.yml`).
+  Le dispatcher POST directement `http://symphony-executor:5000/execute` (réseau Docker interne, secret partagé
+  `X-Symphony-Secret`). L'exécuteur gère lui-même, **en interne**, les 3 essais d'autocorrection (worktree
+  isolé par ticket, gate tests, gate review multi-modèle `review` + `review-b`) — il ne dépend plus d'un
+  callback webhook `run-dev-report` vers n8n pour ça.
+  **Ce qui n'est PAS encore adapté à Phase 3** : `symphony-watchdog.json` et `symphony-merge-handler.json`
+  référencent toujours l'ancien modèle (polling GitHub Actions check-runs, webhook `run-dev-report` HMAC) et
+  ne sont **pas importés/activés** dans n8n — seuls `symphony-dispatcher` et `symphony-create-ticket` le sont.
+  Donc : pas de timeout/budget global appliqué au-delà des 3 essais internes de l'exécuteur, et pas de
+  transition automatique vers `Done` au merge de la PR (à faire manuellement pour l'instant). Voir
+  `docs/symphony-phase3-operations.md` pour l'architecture détaillée, les secrets requis et les pièges trouvés
+  en testant en conditions réelles.
 
 ## Garde-fous (doctrine)
 
@@ -107,20 +115,39 @@ Une PR d'agent qui ne touche aucun test doit le justifier explicitement dans sa 
   d'un `restore.sh` sur VPS vierge.
 - **Tester un script d'install sur une machine vraiment vierge** avant de le considérer fiable — des chemins
   disaster-recovery se sont révélés cassés uniquement en testant sur un VPS vierge, jamais en relisant le code.
+- **Un composant "prêt sur le papier" ne veut rien dire** : le premier test réel de bout en bout de l'exécuteur
+  Phase 3 (2026-08-01) a trouvé 7 bugs bloquants distincts (mounts Docker manquants pour `hermes`, un fichier
+  de scratch compté comme un vrai diff par erreur, une clé LiteLLM mal scopée, une syntaxe CLI `hermes`
+  inventée plutôt que vérifiée via `--help`, une URL `127.0.0.1` invalide en conteneur, une connexion n8n
+  orpheline après un renommage de nœud, et un crash-loop n8n préexistant sans rapport direct mais qui aurait
+  empêché toute activation) — **aucun** n'était détectable par relecture de code ou par les CI (`jq`/`yaml`/
+  `py_compile`) déjà en place. Toujours exécuter le chemin réel (`curl` direct sur l'exécuteur) avant de
+  câbler l'orchestration n8n autour. Détail complet dans `docs/symphony-phase3-operations.md`.
 
-## Secrets requis (Phase 2)
+## Secrets requis (Phase 3)
 
-Deux catégories distinctes, jamais interchangeables :
+Tout consommé côté KVM2 via SOPS (`secrets/.env.enc.env`) — plus aucun secret GitHub Actions, l'exécuteur
+n'est plus un workflow CI mais un conteneur permanent :
 
-- **SOPS (`secrets/.env.enc.env`)** — tout secret consommé côté KVM2 (n8n, LiteLLM) : `LINEAR_API_KEY`
-  (écriture — transitions d'état + commentaires, distinct de `LINEAR_WEBHOOK_SECRET` qui ne sert qu'à la
-  vérification HMAC entrante), `LINEAR_TEAM_ID`, `GITHUB_WEBHOOK_SECRET`, `LITELLM_KEY_AGENT_DEV` (clé
-  virtuelle LiteLLM, budget dédié), `LITELLM_MASTER_KEY` (déjà présent).
-- **Secrets/variables GitHub Actions** : aucun actuellement — le seul workflow qui en avait besoin
-  (`symphony-run-dev.yml`) a été supprimé, jamais testé. À redéfinir quand l'exécuteur de remplacement sera
-  construit (cf. section précédente) : prévoir a minima une clé virtuelle LiteLLM scopée dédiée à la CI
-  (jamais la master key) et une URL d'accès. LiteLLM peut être exposé publiquement en HTTPS via Traefik
-  (même pattern que n8n) si besoin — l'auth reste portée par LiteLLM lui-même, pas par un VPN/ACL réseau.
+- `LINEAR_API_KEY` / `LINEAR_TEAM_ID` — écriture Linear (transitions, commentaires), distinct de
+  `LINEAR_WEBHOOK_SECRET` (vérification HMAC entrante, Phase 1).
+- `LINEAR_STATE_READY` / `LINEAR_STATE_IN_PROGRESS` / `LINEAR_TYPE_LABELS` — mapping vers les states/labels
+  réels du board (confirmés le 2026-07-19, cf. `.env.template`). Non secrets en soi mais stockés au même
+  endroit par convention du repo.
+- `SYMPHONY_TICKET_SECRET` — secret du webhook **public** `symphony-create-ticket` (header `X-Symphony-Secret`).
+- `SYMPHONY_EXECUTOR_SECRET` — secret **distinct** du précédent, pour l'endpoint interne `symphony-executor:5000/execute`
+  (réseau Docker uniquement, mais jamais sans auth : cf. leçon opérationnelle ci-dessous).
+- `LITELLM_KEY_AGENT_WORKER` — clé virtuelle LiteLLM du profil `worker`, scopée `['code', 'review']` (le
+  `review` est nécessaire car `symphony-executor.py` réutilise cette clé pour le 1er reviewer du Gate 2, pas
+  seulement pour l'inférence Hermes elle-même).
+- `LITELLM_KEY_AGENT_REVIEW_B` — clé virtuelle scopée `['review-b']` uniquement (2e reviewer, Claude Sonnet 5
+  via OpenRouter).
+- `GH_TOKEN` — accès push + PR sur le repo cible, consommé par `gh auth setup-git` dans le conteneur.
+- `LITELLM_MASTER_KEY` (déjà présent) — nécessaire pour provisionner/faire évoluer les clés virtuelles
+  ci-dessus, jamais consommé directement par un composant applicatif.
+
+Voir `docs/symphony-phase3-operations.md` pour la procédure de provisioning complète (génération des clés
+virtuelles, budgets recommandés, vérification).
 
 ## À qui fournir les prompts
 

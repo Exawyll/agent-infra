@@ -163,12 +163,16 @@ def execute_task(ticket_id, description):
         for attempt in range(1, max_tries + 1):
             print(f"--- Attempt {attempt}/{max_tries} ---")
 
-            # Hermes Worker Execution
+            # Hermes Worker Execution. There is no --profile/--prompt-file flag
+            # on `hermes chat` — profile is a sticky global set once via
+            # `hermes profile use` (done at process startup, see __main__),
+            # and the query is passed as a plain string argument to -q.
+            # -Q is the separate, unrelated "quiet/programmatic" flag.
             try:
+                with open(prompt_file) as f:
+                    current_prompt = f.read()
                 run_cmd([
-                    "hermes", "chat", "-q",
-                    "--profile", "worker",
-                    "--prompt-file", prompt_file
+                    "hermes", "chat", "-Q", "-q", current_prompt
                 ], cwd=worktree_path)
             except Exception as e:
                 print(f"Hermes execution failed: {e}")
@@ -252,6 +256,10 @@ if __name__ == "__main__":
     if not EXECUTOR_SECRET:
         print("WARNING: SYMPHONY_EXECUTOR_SECRET is not set — /execute will reject every request.")
     ensure_repo()
+    # This container only ever has the `worker` profile mounted — set it as
+    # the sticky default once, since `hermes chat` has no per-invocation
+    # --profile flag.
+    run_cmd(["hermes", "profile", "use", "worker"])
     server_address = ('', PORT)
     httpd = ThreadingHTTPServer(server_address, RequestHandler)
     print(f"Symphony Executor listening on port {PORT}...")

@@ -1,6 +1,9 @@
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+# Without this, Python's stdout is fully buffered (no TTY attached) — print()
+# calls sit in the buffer and never reach `docker logs` until it fills up.
+ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y \
     python3 python3-pip git curl wget jq ca-certificates gnupg \

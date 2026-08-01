@@ -59,6 +59,13 @@ deux côtés (clé + autorisations).
 
 ### Étape 1 — Prouver que LiteLLM répond (ou pas) avec la clé du profil
 
+> ℹ️ Les scripts de diagnostic ci-dessous lisent les clés depuis les
+> `config.yaml` locaux — ils n'ont pas besoin de `SOPS_AGE_KEY_FILE`. En
+> revanche, tout `sops --decrypt` lancé en one-liner nécessite d'abord
+> `export SOPS_AGE_KEY_FILE="$HOME/.age/key.txt"` (ou de passer par
+> `./scripts/deploy.sh`, qui le fait) — sinon le déchiffrement échoue
+> silencieusement et renvoie une sortie vide.
+
 ```bash
 python3 << 'EOF'
 import json, re, urllib.request, urllib.error

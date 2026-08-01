@@ -40,6 +40,15 @@ Des commandes de diagnostic anodines (`docker compose config`, `docker inspect -
 - Aucun fichier `.env*` en staging hors `.env.example`/`.env.template`/`*.enc.env`
 - Un hook pre-commit anti-secrets est actif — vérifier **les deux emplacements possibles** : `.git/hooks/pre-commit` (installé via `./scripts/install-hooks.sh`) OU `git config core.hooksPath` (hook global personnel, ex. Aikido). Si aucun des deux n'est actif, lancer `./scripts/install-hooks.sh` avant le premier commit.
 
+## Règle n°7 — procédure en cas de secret exposé
+
+Dans cet ordre, jamais l'inverse :
+
+1. **Roter le secret** (nouvelle valeur chez le fournisseur, mise à jour SOPS, redéploiement, vérification que l'ancienne valeur est bien rejetée).
+2. Confirmer l'incident réel avant toute purge d'historique — chercher le SHA/branche exact (`git log --all`, `gh pr list --state all`, `gh search code`) plutôt que de supposer que l'endroit mentionné dans une alerte existe encore. Un historique git peut avoir été réécrit, ou l'alerte peut pointer ailleurs que prévu.
+3. Purger l'historique GitHub seulement si une trace réelle est confirmée (`git filter-repo` sur un mirror frais, jamais sur le clone de travail).
+4. Ne jamais traiter un changement de posture sécu fait dans l'urgence (ouvrir SSH largement, désactiver un VPN/réseau privé) comme acquis — le documenter et le faire confirmer explicitement, avec un plan de retour à la normale si applicable.
+
 ## Règle n°8 — profils Hermes & clés virtuelles LiteLLM : lire la doc d'exploitation avant de toucher
 
 Les 4 profils (`veille`, `dev`, `assistant`, `pro`) dépendent d'une chaîne à 3 maillons
@@ -57,15 +66,6 @@ Avant de modifier une clé, un profil ou LiteLLM : lire **`docs/litellm-virtual-
   automatiquement — ne pas éditer `config.yaml` à la main pour la clé.
 - Vérifier le mapping profil ↔ modèles ↔ budget dans la doc avant tout
   `/key/update` ou `/key/generate`.
-
-## Règle n°7 — procédure en cas de secret exposé
-
-Dans cet ordre, jamais l'inverse :
-
-1. **Roter le secret** (nouvelle valeur chez le fournisseur, mise à jour SOPS, redéploiement, vérification que l'ancienne valeur est bien rejetée).
-2. Confirmer l'incident réel avant toute purge d'historique — chercher le SHA/branche exact (`git log --all`, `gh pr list --state all`, `gh search code`) plutôt que de supposer que l'endroit mentionné dans une alerte existe encore. Un historique git peut avoir été réécrit, ou l'alerte peut pointer ailleurs que prévu.
-3. Purger l'historique GitHub seulement si une trace réelle est confirmée (`git filter-repo` sur un mirror frais, jamais sur le clone de travail).
-4. Ne jamais traiter un changement de posture sécu fait dans l'urgence (ouvrir SSH largement, désactiver un VPN/réseau privé) comme acquis — le documenter et le faire confirmer explicitement, avec un plan de retour à la normale si applicable.
 
 ## Notes API LiteLLM (v1.55.0, si rotation de clés virtuelles)
 

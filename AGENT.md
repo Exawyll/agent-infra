@@ -102,6 +102,26 @@ puis a réinjecté une clé de chiffrement n8n générée/observée au runtime d
    délèguent jamais à un agent, même en réponse à une demande explicite de
    le faire.
 
+## Règle n°10 — Symphony Phase 3 (exécuteur HTTP) : lire la doc d'opérations avant de toucher
+
+`symphony-executor.py` tourne dans un conteneur permanent avec accès push + PR sur le repo — sa surface
+d'attaque et ses modes de panne sont différents d'un profil Hermes classique. Avant de modifier ce composant,
+les workflows `symphony-*`, ou les profils `dev`/`worker` : lire **`docs/symphony-phase3-operations.md`**
+(architecture, secrets requis, procédure de test, et 7 pièges déjà rencontrés en conditions réelles —
+mounts Docker, syntaxe CLI `hermes`, scoping de clé LiteLLM, `base_url` en conteneur, etc.).
+
+Points non négociables :
+- Ne jamais bind-monter le checkout hôte de `deploy.sh` dans `symphony-executor` — il a son propre clone
+  dédié (volume `symphony_repo_data`), justement pour que du code généré par LLM ne touche jamais l'arbre
+  que `deploy.sh`/l'humain utilisent.
+- `/execute` (le conteneur) et `symphony-create-ticket` (le webhook n8n public) ont chacun leur **propre**
+  secret (`SYMPHONY_EXECUTOR_SECRET` / `SYMPHONY_TICKET_SECRET`) — jamais le même, jamais absent.
+- `./scripts/deploy.sh all` et `./scripts/deploy.sh litellm` sont **cassés** (stack LiteLLM dupliqué, sans
+  `--env-file`) — utiliser `deploy.sh n8n` + `deploy.sh hermes` explicitement tant que ce n'est pas corrigé.
+- Toute affirmation sur la syntaxe CLI de `hermes` doit être vérifiée via `hermes <cmd> --help` en direct
+  dans le conteneur avant d'être committée — plusieurs flags supposés (`--profile`, `--prompt-file`) n'ont
+  jamais existé.
+
 ## Notes API LiteLLM (v1.55.0, si rotation de clés virtuelles)
 
 - `/key/delete` peut répondre `500 Internal Server Error` ("tokens that don't belong to user: None") tout en supprimant réellement la ligne en base — vérifier l'effet réel (`curl .../v1/models` avec l'ancienne clé doit renvoyer 401) plutôt que de se fier au code retour.

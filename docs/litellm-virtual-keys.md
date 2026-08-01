@@ -36,7 +36,7 @@ Chaque maillon doit être cohérent : **SOPS → config.yaml → clé virtuelle 
 | `dev` | `agent-dev` | `code`, `review` | $20/30j | PR review, dev |
 | `assistant` | `agent-assistant` | `rapide`, `raisonnement` | $10/30j | Quotidien |
 | `pro` | `agent-pro` | `rapide`, `raisonnement` | $10/30j | Pro |
-| `worker` | `agent-worker` (env `LITELLM_KEY_AGENT_WORKER`) | `code` | à définir | Symphony Phase 3 — exécution du ticket (git worktree, tests, commit) |
+| `worker` | `agent-worker` (env `LITELLM_KEY_AGENT_WORKER`) | `code`, `review` | $20/30j | Symphony Phase 3 — exécution du ticket (git worktree, tests, commit) ; `review` requis car `symphony-executor.py` réutilise cette même clé pour le 1er reviewer du Gate 2 |
 | — | `agent-review-b` (env `LITELLM_KEY_AGENT_REVIEW_B`) | `review-b` | à définir | Symphony Phase 3 — Gate 2, 2e reviewer indépendant (appelé par `symphony-executor.py`, pas un profil Hermes) |
 
 Alias LiteLLM (config dans `kvm2/docker/litellm/config.yaml` et sa copie

@@ -129,6 +129,11 @@ services:
       # also holds the veille/dev/assistant/pro profiles' virtual keys.
       - ${HOME}/.hermes/profiles/worker:/root/.hermes/profiles/worker
       - /usr/local/bin/hermes:/usr/local/bin/hermes:ro
+      # The wrapper at /usr/local/bin/hermes execs into this venv, whose own
+      # python3 is itself a symlink into the uv-managed standalone interpreter
+      # below — both are needed, the wrapper alone 404s at runtime.
+      - /usr/local/lib/hermes-agent:/usr/local/lib/hermes-agent:ro
+      - /usr/local/share/uv:/usr/local/share/uv:ro
     working_dir: /root/agent-infra
 
 networks:

@@ -151,7 +151,12 @@ def execute_task(ticket_id, description):
         max_tries = 3
         success = False
 
-        prompt_file = os.path.join(worktree_path, ".task_brief")
+        # Deliberately a sibling of worktree_path, never inside it: `git add -A`
+        # below would otherwise stage this scratch file as a "change", making
+        # Gate 1/2 run even when Hermes produced no real diff at all — which is
+        # exactly what happened the first time this ran (hermes was broken,
+        # yet the pipeline still proceeded because .task_brief counted as one).
+        prompt_file = f"/tmp/sandbox-{ticket_id}.task_brief"
         with open(prompt_file, "w") as f:
             f.write(description)
 
@@ -163,7 +168,7 @@ def execute_task(ticket_id, description):
                 run_cmd([
                     "hermes", "chat", "-q",
                     "--profile", "worker",
-                    "--prompt-file", ".task_brief"
+                    "--prompt-file", prompt_file
                 ], cwd=worktree_path)
             except Exception as e:
                 print(f"Hermes execution failed: {e}")
@@ -238,6 +243,7 @@ def execute_task(ticket_id, description):
     finally:
         print("Cleaning up worktree...")
         subprocess.run(["git", "worktree", "remove", "--force", worktree_path], capture_output=True, cwd=REPO_DIR)
+        subprocess.run(["rm", "-f", f"/tmp/sandbox-{ticket_id}.task_brief"], capture_output=True)
         # We leave the branch behind, but if it failed, maybe we should delete it.
         # For now, it stays as forensic evidence if it pushed, or just local if not pushed.
 

@@ -1,3 +1,4 @@
+<!-- agent-infra — infrastructure reproductible pour le cerveau KVM2 -->
 # agent-infra
 
 Infrastructure reproductible pour KVM2 (le cerveau) : n8n + Hermes + LiteLLM.

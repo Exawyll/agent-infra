@@ -37,8 +37,20 @@ decrypt_full_env() {
   fi
   echo "🔓 Decrypting secrets..."
   export SOPS_AGE_KEY_FILE="$HOME/.age/key.txt"
-  sops --decrypt "${SECRETS_DIR}/.env.enc.env" > "${_ENV_FILE}"
+  # Set _ENV_CREATED before attempting the decrypt: the `>` redirection
+  # creates/truncates _ENV_FILE before sops even runs, so on failure an
+  # empty file is left behind regardless. Marking it now guarantees the
+  # cleanup() trap removes that empty file instead of leaving it to poison
+  # the next run (deploy_n8n() would otherwise treat it as "already decrypted").
   _ENV_CREATED=true
+  if ! sops --decrypt "${SECRETS_DIR}/.env.enc.env" > "${_ENV_FILE}"; then
+    echo "❌ Failed to decrypt secrets/.env.enc.env — check that SOPS_AGE_KEY_FILE (~/.age/key.txt) matches the recipient in .sops.yaml" >&2
+    exit 1
+  fi
+  if [ ! -s "${_ENV_FILE}" ]; then
+    echo "❌ Decrypted .env is empty — aborting" >&2
+    exit 1
+  fi
   echo "✅ Secrets decrypted to .env (cleaned up after deploy)"
 }
 
@@ -179,7 +191,11 @@ deploy_n8n() {
   echo "🚀 Deploying n8n stack..."
   cd "${REPO_ROOT}/kvm2/docker/n8n"
 
-  if [ ! -f "${_ENV_FILE}" ]; then
+  # -s (not just -f): a stale empty .env from a previously failed decrypt
+  # must not be mistaken for "already good" — that's what silently skipped
+  # re-decryption and shipped blank secrets to docker compose last time.
+  if [ ! -s "${_ENV_FILE}" ]; then
+    rm -f "${_ENV_FILE}"
     if [ -f "${SECRETS_DIR}/.env.enc.env" ]; then
       decrypt_full_env
     else

@@ -49,6 +49,24 @@ Dans cet ordre, jamais l'inverse :
 3. Purger l'historique GitHub seulement si une trace réelle est confirmée (`git filter-repo` sur un mirror frais, jamais sur le clone de travail).
 4. Ne jamais traiter un changement de posture sécu fait dans l'urgence (ouvrir SSH largement, désactiver un VPN/réseau privé) comme acquis — le documenter et le faire confirmer explicitement, avec un plan de retour à la normale si applicable.
 
+## Règle n°8 — profils Hermes & clés virtuelles LiteLLM : lire la doc d'exploitation avant de toucher
+
+Les 4 profils (`veille`, `dev`, `assistant`, `pro`) dépendent d'une chaîne à 3 maillons
+**SOPS → config.yaml → clé virtuelle LiteLLM**. Une incohérence sur un seul maillon
+tue le bot silencieusement (401 sur tous les appels, gateway en vie mais muet).
+
+Avant de modifier une clé, un profil ou LiteLLM : lire **`docs/litellm-virtual-keys.md`**
+(diagnostic 3 étapes, correction type, pièges). Points non négociables :
+
+- Les clés virtuelles (`agent-*`) doivent avoir des `models` **non vides** — `models: []`
+  = clé existante mais inutilisable (symptôme 401 `Invalid proxy server token`).
+- Ne jamais copier un **hash** retourné par `/key/list` ou `/key/info` dans un
+  `config.yaml` (symptôme `expected to start with 'sk-'`).
+- Depuis `e0b5eb5`, `./scripts/deploy.sh hermes` injecte la clé depuis SOPS
+  automatiquement — ne pas éditer `config.yaml` à la main pour la clé.
+- Vérifier le mapping profil ↔ modèles ↔ budget dans la doc avant tout
+  `/key/update` ou `/key/generate`.
+
 ## Notes API LiteLLM (v1.55.0, si rotation de clés virtuelles)
 
 - `/key/delete` peut répondre `500 Internal Server Error` ("tokens that don't belong to user: None") tout en supprimant réellement la ligne en base — vérifier l'effet réel (`curl .../v1/models` avec l'ancienne clé doit renvoyer 401) plutôt que de se fier au code retour.

@@ -230,7 +230,7 @@
       "main": [[ { "node": "Linear: poser label attempt:1", "type": "main", "index": 0 } ]]
     },
     "Linear: poser label attempt:1": {
-      "main": [[ { "node": "GitHub: workflow_dispatch run-dev", "type": "main", "index": 0 } ]]
+      "main": [[ { "node": "Symphony Executor: POST /execute", "type": "main", "index": 0 } ]]
     }
   },
   "settings": {

@@ -97,10 +97,32 @@ services:
       - PO_EMAIL=${PO_EMAIL}
       - TELEGRAM_CHAT_ID_DEV=${TELEGRAM_CHAT_ID_DEV}
       - LINEAR_WEBHOOK_SECRET=${LINEAR_WEBHOOK_SECRET}
+      - LINEAR_API_KEY=${LINEAR_API_KEY}
+      - LINEAR_TEAM_ID=${LINEAR_TEAM_ID}
+      - LINEAR_STATE_READY=${LINEAR_STATE_READY}
+      - LINEAR_STATE_IN_PROGRESS=${LINEAR_STATE_IN_PROGRESS}
+      - LINEAR_TYPE_LABELS=${LINEAR_TYPE_LABELS}
+      - SYMPHONY_TICKET_SECRET=${SYMPHONY_TICKET_SECRET}
     volumes:
       - n8n_data:/home/node/.n8n
       - /local-files:/files
       - /var/local/hermes/factfulness_log.json:/files/factfulness_log.json:ro
+
+  symphony-executor:
+    build:
+      context: ../../../
+      dockerfile: kvm2/docker/symphony-executor/Dockerfile
+    restart: always
+    env_file:
+      - ${HOME}/.hermes/profiles/worker/.env
+    environment:
+      - LITELLM_BASE_URL=http://litellm:4000/v1/chat/completions
+    volumes:
+      - ../../../:/root/agent-infra
+      - ~/.hermes:/root/.hermes
+      - /usr/local/bin/hermes:/usr/local/bin/hermes:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    working_dir: /root/agent-infra
 
 networks:
   default:

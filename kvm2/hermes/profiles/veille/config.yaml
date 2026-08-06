@@ -62,13 +62,15 @@ gateway:
 # ─── Webhooks n8n → Hermes ───────────────────────────────────────────
 # n8n Schedule Trigger → HTTP Request vers ces webhooks → Hermes met en
 # forme ET publie sur Telegram. n8n ne diffuse rien.
-# Bind: Tailscale KVM2 (100.106.174.46), jamais 0.0.0.0.
+# Bind: bridge Docker KVM2 (172.18.0.1 — gateway du réseau n8n, atteignable
+# uniquement depuis les conteneurs du stack n8n), jamais 0.0.0.0 ni IP publique.
+# (Ex-Tailscale 100.106.174.46 : l'IP n'existe plus sur l'hôte → bind impossible.)
 # HMAC + signature obligatoires (secret dans SOPS).
 platforms:
   webhook:
     enabled: true
     extra:
-      host: "100.106.174.46"
+      host: "172.18.0.1"
       port: 8644
       secret: PLACEHOLDER_WEBHOOK_SECRET_SOPS
       routes:

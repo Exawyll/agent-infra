@@ -83,6 +83,12 @@
         "operation": "sendMessage",
         "chatId": "8262789577",
         "text": "=🚨 *ÉCHEC — Actus Positives*\n\nLe webhook Hermes `factfulness-daily` n'a pas répondu.\n\n- Statut HTTP : `{{ $json.statusCode }}`\n- Erreur : {{ $json.error || 'pas de détail' }}\n- Horodatage : {{ $now }}"
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "ihZuIM3ZQcKsWsu9",
+          "name": "Telegram account"
+        }
       }
     }
   ],

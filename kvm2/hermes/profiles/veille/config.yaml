@@ -114,7 +114,7 @@ platforms:
 
             ## 📋 IMPORTANT : Déduplication avec un fichier de suivi
 
-            Avant de chercher des news, lis le fichier `/root/.hermes/factfulness_log.json` via `read_file(path='/root/.hermes/factfulness_log.json')`. Tu y trouveras la liste des sujets déjà envoyés les jours précédents.
+            Avant de chercher des news, lis le fichier `/var/local/hermes/factfulness_log.json` via `read_file(path='/var/local/hermes/factfulness_log.json')`. Tu y trouveras la liste des sujets déjà envoyés les jours précédents.
 
             ### Règles :
             1. **Choisis 3 à 5 news positives** (progrès scientifique, santé, environnement, pauvreté, éducation, etc.)
@@ -136,7 +136,7 @@ platforms:
             ```
 
             ### Après avoir envoyé les news :
-            Avant de terminer, mets à jour le fichier via la fonction `write_file(path='/root/.hermes/factfulness_log.json', content=...)` :
+            Avant de terminer, mets à jour le fichier via la fonction `write_file(path='/var/local/hermes/factfulness_log.json', content=...)` :
             1. Ajoute un objet pour chaque news envoyée aujourd'hui : `{"date": "2026-07-10", "title": "Titre de la news", "topic": "mot-clé du sujet"}`
             2. Conserve TOUT l'historique précédent (ne l'écrase pas)
             3. Mets à jour `last_updated` avec la date du jour

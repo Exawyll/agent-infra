@@ -20,6 +20,19 @@ toolsets:
   - file
   - skills
 
+# Les sessions déclenchées par webhook utilisent le toolset composite
+# `hermes-webhook` (web_search, web_extract, vision_analyze, clarify) par
+# défaut — le top-level `toolsets:` est IGNORÉ pour la plateforme webhook.
+# La dédup factfulness exige read_file/write_file : on ré-ajoute
+# explicitement `file` + `skills` pour la plateforme webhook.
+# (Sécurité : webhook HMAC-protégé ; `file` = accès filesystem hôte — à
+# restreindre si le périmètre webhook s'élargit.)
+platform_toolsets:
+  webhook:
+    - hermes-webhook
+    - file
+    - skills
+
 agent:
   max_turns: 50
   gateway_timeout: 600

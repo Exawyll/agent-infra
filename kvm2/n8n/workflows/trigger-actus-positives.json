@@ -38,7 +38,7 @@
       "position": [600, 0],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "try {\n  const fileData = $input.first().json.data;\n  const entries = fileData ? (JSON.parse(fileData).entries || []) : [];\n  const crypto = require('crypto');\n  const body = JSON.stringify({ dedup_log: entries });\n  const signature = 'sha256=' + crypto.createHmac('sha256', process.env.WEBHOOK_SECRET || '').update(body).digest('hex');\n  const res = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://172.18.0.1:8644/webhooks/factfulness-daily',\n    headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': signature },\n    body\n  });\n  return [{ json: { statusCode: (res && res.statusCode) || 200 } }];\n} catch (e) {\n  return [{ json: { statusCode: (e && (e.statusCode || (e.response && e.response.status))) || 500, error: e.message || String(e) } }];\n}"
+        "jsCode": "try {\n  const fileData = $input.first().json.data;\n  const entries = fileData ? (JSON.parse(fileData).entries || []) : [];\n  const crypto = require('crypto');\n  const body = JSON.stringify({ dedup_log: entries });\n  const signature = 'sha256=' + crypto.createHmac('sha256', $env.WEBHOOK_SECRET || '').update(body).digest('hex');\n  const res = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://172.18.0.1:8644/webhooks/factfulness-daily',\n    headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': signature },\n    body\n  });\n  return [{ json: { statusCode: (res && res.statusCode) || 200 } }];\n} catch (e) {\n  return [{ json: { statusCode: (e && (e.statusCode || (e.response && e.response.status))) || 500, error: e.message || String(e) } }];\n}"
       }
     },
     {

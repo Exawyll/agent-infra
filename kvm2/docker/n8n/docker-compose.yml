@@ -80,6 +80,7 @@ services:
       - N8N_TEMPLATES_HOST=https://api.n8n.io/api/
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
       - N8N_RESTRICT_FILE_ACCESS_TO=/files
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
       - NODE_FUNCTION_ALLOW_BUILTIN=crypto
       - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
       - N8N_PORT=5678

@@ -209,6 +209,20 @@ write_profile_env() {
       ;;
   esac
 
+  # ── 3. Web search provider (Firecrawl) ────────────────────────
+  # Hermes 0.17 only registers web_search/web_extract when a provider is
+  # available — without this key the tools silently vanish (config.yaml's
+  # `web.backend: firecrawl` alone is not enough). `pro` is deliberately
+  # excluded: walled-off professional use, its queries must not reach a
+  # third-party service.
+  case "$profile" in
+    veille|assistant)
+      local firecrawl_key
+      firecrawl_key=$(extract_secret "FIRECRAWL_API_KEY")
+      [ -n "$firecrawl_key" ] && echo "FIRECRAWL_API_KEY=${firecrawl_key}" >> "$tmp_env"
+      ;;
+  esac
+
   # Replace existing .env if we wrote something
   if [ -s "$tmp_env" ]; then
     mv "$tmp_env" "$dst"
@@ -217,6 +231,30 @@ write_profile_env() {
     rm -f "$tmp_env"
     echo "  ⚠️  ${profile}/.env: empty — no secrets extracted"
   fi
+}
+
+# ── Default Hermes profile (~/.hermes/.env) ───────────────────────
+# Not handled by write_profile_env(): the default profile has no directory
+# under kvm2/hermes/profiles/ and its .env holds vars we don't generate, so
+# it must never be rewritten wholesale. Upsert only the keys we own.
+upsert_default_profile_env() {
+  local dst="${HOME}/.hermes/.env"
+  local firecrawl_key
+  firecrawl_key=$(extract_secret "FIRECRAWL_API_KEY")
+  [ -z "$firecrawl_key" ] && return 0
+
+  if [ ! -f "$dst" ]; then
+    echo "  ⚠️  default/.env: ${dst} not found — skipping FIRECRAWL_API_KEY"
+    return 0
+  fi
+
+  local tmp_env
+  tmp_env=$(mktemp)
+  chmod 600 "$tmp_env"
+  { grep -v '^FIRECRAWL_API_KEY=' "$dst" || true; echo "FIRECRAWL_API_KEY=${firecrawl_key}"; } > "$tmp_env"
+  mv "$tmp_env" "$dst"
+  chmod 600 "$dst"
+  echo "  📋 default/.env: FIRECRAWL_API_KEY upserted from SOPS"
 }
 
 # ── Components ─────────────────────────────────────────────────────
@@ -376,6 +414,7 @@ with open('$dst_config', 'w') as f:
     [ ! -f "${profile_dir}config.yaml" ] && continue
     write_profile_env "$profile_name"
   done
+  upsert_default_profile_env
 
   echo "✅ Hermes deployed"
 

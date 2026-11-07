@@ -110,3 +110,17 @@ web:
   search_backend: ''
   extract_backend: ''
   use_gateway: false
+
+toolsets:
+  - hermes-cli
+
+# `agent` n'est PAS dans l'overlay : le bloc live porte ~25 sous-clés gérées par
+# Hermes (personalities, timeouts…) qu'un remplacement de premier niveau
+# écraserait. Valeurs live de référence (relevées le 2026-11-07, à reporter à la
+# main via `hermes config` sur un serveur reconstruit) :
+#   agent.max_turns: 150            agent.gateway_timeout: 1800
+#   agent.api_max_retries: 3        agent.tool_use_enforcement: auto
+#   agent.task_completion_guidance: true
+#   agent.parallel_tool_call_guidance: true
+#   agent.environment_probe: true   agent.coding_context: auto
+#   agent.reasoning_effort: medium

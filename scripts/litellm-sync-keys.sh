@@ -30,6 +30,7 @@ LITELLM_URL="${LITELLM_URL:-http://127.0.0.1:4000}"
 # Les alias de secours (deepseek-flash, deepseek-pro) n'ont pas besoin d'être
 # listés : LiteLLM applique les fallbacks après l'autorisation du modèle demandé.
 KEY_POLICY="
+LITELLM_KEY_AGENT_DEFAULT|agent-default|rapide,raisonnement|10|30d
 LITELLM_KEY_AGENT_VEILLE|agent-veille|rapide|5|30d
 LITELLM_KEY_AGENT_ASSISTANT|agent-assistant|rapide,raisonnement|10|30d
 LITELLM_KEY_AGENT_PRO|agent-pro|pro-rapide,pro-raisonnement|10|30d

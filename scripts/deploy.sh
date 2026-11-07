@@ -390,7 +390,19 @@ with open('$dst_config', 'w') as f:
   local veille_skills_dst="${hermes_profiles}/veille/skills"
   if [ -d "$veille_skills_src" ]; then
     mkdir -p "$veille_skills_dst"
-    cp -r "$veille_skills_src"/* "$veille_skills_dst/"
+    # Chaque skill versionné REMPLACE entièrement sa copie déployée : un simple
+    # `cp -r` par-dessus laisserait les fichiers que l'agent a ajoutés lui-même
+    # (ex. references/ réécrites via skill_manage), qui dérivent du repo et
+    # alourdissent le contexte de chaque run. Les skills non versionnés
+    # (bundled Hermes) ne sont pas touchés.
+    local skill_src
+    for skill_src in "$veille_skills_src"/*/; do
+      [ -d "$skill_src" ] || continue
+      local skill_name
+      skill_name=$(basename "$skill_src")
+      rm -rf "${veille_skills_dst:?}/${skill_name}"
+      cp -r "$skill_src" "${veille_skills_dst}/${skill_name}"
+    done
     echo "  📚 Veille skills deployed"
   fi
 

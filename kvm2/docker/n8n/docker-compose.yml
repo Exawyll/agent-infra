@@ -108,8 +108,12 @@ services:
       - SYMPHONY_EXECUTOR_SECRET=${SYMPHONY_EXECUTOR_SECRET}
     volumes:
       - n8n_data:/home/node/.n8n
+      # /local-files est partagé avec Hermes (profil veille) : le log de dédup
+      # factfulness y vit, en un seul exemplaire (/local-files/factfulness_log.json
+      # côté hôte = /files/factfulness_log.json côté n8n). Ne pas ré-ajouter de
+      # bind sur /var/local/hermes : cette copie, écrasée toutes les 30 min par
+      # un cron manuel, a figé la dédup au 18/07/2026 pendant des mois.
       - /local-files:/files
-      - /var/local/hermes/factfulness_log.json:/files/factfulness_log.json:ro
 
   symphony-executor:
     build:

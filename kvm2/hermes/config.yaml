@@ -2,7 +2,7 @@
 #
 # Le fichier déployé est généré et migré par Hermes lui-même (~800 lignes,
 # `_config_version`) : on ne l'écrase jamais. `deploy.sh hermes`
-# (deploy_default_profile_config) remplace UNIQUEMENT les clés de premier niveau
+# (deploy_default_profile_config) remplace UNIQUEMENT les clés de premier niveau (model, fallback_providers, web)
 # présentes ici et laisse tout le reste intact (sauvegarde horodatée avant écriture).
 #
 # Clé : agent-default (SOPS LITELLM_KEY_AGENT_DEFAULT) → rapide + raisonnement.
@@ -20,6 +20,17 @@ model:
   api_mode: chat_completions
 
 fallback_providers: []
+
+# Recherche/extraction web via la clé Firecrawl directe (FIRECRAWL_API_KEY,
+# injectée dans ~/.hermes/.env par upsert_default_profile_env). Avec
+# use_gateway: true, Hermes force le Nous Tool Gateway même si la clé directe est
+# présente — sans abonnement Nous, web_search/web_extract échouent tous
+# (« Web tools are not configured »).
+web:
+  backend: firecrawl
+  search_backend: ''
+  extract_backend: ''
+  use_gateway: false
 
 toolsets:
   - hermes-cli

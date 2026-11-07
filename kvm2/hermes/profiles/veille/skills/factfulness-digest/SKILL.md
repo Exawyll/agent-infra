@@ -25,8 +25,8 @@ metadata:
 - **Log de déduplication — un seul fichier** : `/local-files/factfulness_log.json`
   (`{"last_updated": "AAAA-MM-JJ", "entries": [{"date", "title", "topic"}]}`, 365 entrées max).
   n8n le voit sous `/files/factfulness_log.json`. Les anciennes copies `/var/local/hermes/…` et
-  `/root/.hermes/…` ont été supprimées le 2026-11-07 (un cron manuel écrasait la première avec
-  une version de juillet toutes les 30 min, d'où des mois de « log figé au 18/07 »).
+  `/root/.hermes/…` ainsi que le cron qui écrasait la première (d'où des mois de « log figé au
+  18/07 ») sont archivées/supprimés à chaque `deploy.sh hermes` (`cleanup_legacy_factfulness_log`).
 
 ## Déroulé d'un run
 

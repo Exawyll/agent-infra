@@ -296,6 +296,31 @@ deploy_litellm() {
   echo "✅ LiteLLM deployed"
 }
 
+# Ancien montage du log de dédup factfulness (avant 2026-11-07) : un cron
+# manuel, jamais versionné, recopiait toutes les 30 min une version de juillet
+# de /root/.hermes/factfulness_log.json sur /var/local/hermes/, ce qui figeait
+# la dédup. La seule copie vivante est désormais /local-files/factfulness_log.json.
+# Idempotent : sans effet si tout est déjà propre. Les anciennes copies sont
+# archivées (jamais supprimées sans trace) dans /root/backups/factfulness/.
+# Doit tourner APRÈS deploy_n8n : l'ancien compose n8n montait
+# /var/local/hermes/factfulness_log.json, et un bind vers un fichier absent
+# ferait créer un répertoire à sa place au prochain démarrage du conteneur.
+cleanup_legacy_factfulness_log() {
+  local cron_file="/etc/cron.d/hermes-dedup-sync"
+  if [ -f "$cron_file" ]; then
+    rm -f "$cron_file"
+    echo "  🧹 Cron legacy supprimé : ${cron_file}"
+  fi
+
+  local legacy archive_dir="/root/backups/factfulness"
+  for legacy in /root/.hermes/factfulness_log.json /var/local/hermes/factfulness_log.json; do
+    [ -f "$legacy" ] || continue
+    install -d -m 0700 "$archive_dir"
+    mv "$legacy" "${archive_dir}/$(echo "${legacy#/}" | tr '/' '_').$(date +%F_%H%M%S)"
+    echo "  🧹 Ancienne copie archivée : ${legacy} → ${archive_dir}/"
+  done
+}
+
 deploy_hermes() {
   echo "🚀 Deploying Hermes profiles + webhook secrets..."
 
@@ -405,6 +430,8 @@ with open('$dst_config', 'w') as f:
     done
     echo "  📚 Veille skills deployed"
   fi
+
+  cleanup_legacy_factfulness_log
 
   echo "🔧 Installing Hermes gateway services (per profile, user-level systemd)..."
   if [ -d "$repo_profiles" ]; then

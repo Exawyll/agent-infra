@@ -280,12 +280,24 @@ deploy_default_profile_config() {
   local result
   # Secret via l'environnement du process python3, jamais en argument.
   result=$(DEFAULT_KEY="$key" SRC="$src" DST="$dst" python3 - <<'PY'
-import json, os, shutil, time, urllib.request, yaml
+import json, os, shutil, sys, time, urllib.request, yaml
 src, dst, key = os.environ["SRC"], os.environ["DST"], os.environ["DEFAULT_KEY"]
 os.umask(0o077)  # sauvegarde et fichier temporaire contiennent la clé en clair
 overlay = yaml.safe_load(open(src)) or {}
-# La clé doit déjà exister dans LiteLLM et autoriser le modèle par défaut
-# (créée par litellm-sync-keys.sh, lancé par `deploy.sh n8n`).
+# La clé doit déjà exister dans LiteLLM et autoriser TOUS les alias que
+# l'overlay référence (modèle principal, sous-agents, slots MOA) — sinon un
+# `deploy.sh hermes` lancé avant `deploy.sh n8n` (litellm-sync-keys.sh) passerait
+# et MOA prendrait des HTTP 403 à l'usage seulement.
+litellm_url = overlay["model"]["base_url"]
+required = {overlay["model"]["default"]}
+deleg = overlay.get("delegation") or {}
+if deleg.get("base_url") == litellm_url and deleg.get("model"):
+    required.add(deleg["model"])
+moa = overlay.get("moa") or {}
+slots = list(moa.get("reference_models") or []) + [moa.get("aggregator") or {}]
+for preset in (moa.get("presets") or {}).values():
+    slots += list(preset.get("reference_models") or []) + [preset.get("aggregator") or {}]
+required |= {sl["model"] for sl in slots if sl.get("provider") == "litellm" and sl.get("model")}
 base = overlay["model"]["base_url"].rsplit("/v1", 1)[0]
 try:
     req = urllib.request.Request(base + "/key/info", headers={"Authorization": f"Bearer {key}"})
@@ -293,14 +305,31 @@ try:
         allowed = json.load(r).get("info", {}).get("models", [])
 except Exception:
     allowed = None
-if allowed is None or overlay["model"]["default"] not in allowed:
+missing = sorted(required - set(allowed or []))
+if allowed is None or missing:
+    print("key-not-ready", *missing, file=sys.stderr)
     print("key-not-ready")
     raise SystemExit(0)
-overlay["model"]["api_key"] = key
+def inject(node):
+    # Remplace chaque PLACEHOLDER_REPLACE_LOCALLY (model, providers.*) par la clé.
+    if isinstance(node, dict):
+        return {k: inject(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [inject(v) for v in node]
+    return key if node == "PLACEHOLDER_REPLACE_LOCALLY" else node
+overlay = inject(overlay)
 live = {}
 if os.path.exists(dst):
     live = yaml.safe_load(open(dst)) or {}
 merged = {**live, **overlay}
+# Fusion superficielle voulue (le repo fait foi pour ces blocs), mais jamais
+# silencieuse : signaler les sous-clés live qui vont disparaître (noms seuls,
+# jamais les valeurs) pour qu'un ajout fait en live soit rapatrié dans le repo.
+for k, v in overlay.items():
+    if isinstance(v, dict) and isinstance(live.get(k), dict):
+        lost = sorted(set(live[k]) - set(v))
+        if lost:
+            print(f"  ⚠️  default/config.yaml: {k}.{{{', '.join(lost)}}} présent en live, absent de l'overlay → supprimé (rapatrier dans kvm2/hermes/config.yaml si voulu)", file=sys.stderr)
 if merged == live:
     print("unchanged")
 else:
@@ -323,7 +352,7 @@ PY
     echo "  🚀 default: gateway install"
     hermes gateway install --force < /dev/null 2>&1 | tail -3
   elif [ "$result" = "key-not-ready" ]; then
-    echo "  ⚠️  default/config.yaml: clé agent-default inconnue de LiteLLM ou sans le modèle par défaut — config live inchangée"
+    echo "  ⚠️  default/config.yaml: clé agent-default inconnue de LiteLLM ou sans un alias requis (détail ci-dessus) — config live inchangée"
     echo "     Lancer d'abord : ./scripts/deploy.sh n8n (synchro des clés)"
   else
     echo "  ✅ default/config.yaml: déjà à jour"

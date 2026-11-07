@@ -82,7 +82,10 @@ for line in os.environ["KEY_POLICY"].strip().splitlines():
     var, alias, models, budget, duration = line.split("|")
     raw = os.environ.get(var, "")
     if not raw:
-        print(f"  ⚠️  {alias}: {var} absent de SOPS — ignorée")
+        # Compté comme une erreur : sinon le profil prendrait des 401 au premier
+        # appel alors que le déploiement s'afficherait comme sain.
+        print(f"  ❌ {alias}: {var} absent du .env (SOPS) — clé non créée")
+        errors += 1
         continue
     policy = {"key_alias": alias, "models": models.split(","),
               "max_budget": float(budget), "budget_duration": duration}

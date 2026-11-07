@@ -257,6 +257,76 @@ upsert_default_profile_env() {
   echo "  📋 default/.env: FIRECRAWL_API_KEY upserted from SOPS"
 }
 
+# ── Default Hermes profile config (~/.hermes/config.yaml) ─────────
+# Unlike the named profiles, the deployed default config is generated and
+# migrated by Hermes itself (~800 lines, `_config_version`): copying the repo
+# file over it would wipe every live-only setting. kvm2/hermes/config.yaml is
+# therefore an overlay — only its top-level keys replace the live ones.
+# Refuses to switch to LiteLLM without a real virtual key: a placeholder
+# api_key would take the main Telegram bot down instead of rerouting it.
+deploy_default_profile_config() {
+  local src="${REPO_ROOT}/kvm2/hermes/config.yaml"
+  local dst="${HOME}/.hermes/config.yaml"
+  [ -f "$src" ] || return 0
+
+  local key
+  key=$(extract_secret "LITELLM_KEY_AGENT_DEFAULT")
+  if [[ "$key" != sk-* ]]; then
+    echo "  ⚠️  default/config.yaml: LITELLM_KEY_AGENT_DEFAULT absent de SOPS — config live inchangée"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$dst")"
+  local result
+  # Secret via l'environnement du process python3, jamais en argument.
+  result=$(DEFAULT_KEY="$key" SRC="$src" DST="$dst" python3 - <<'PY'
+import json, os, shutil, time, urllib.request, yaml
+src, dst, key = os.environ["SRC"], os.environ["DST"], os.environ["DEFAULT_KEY"]
+overlay = yaml.safe_load(open(src)) or {}
+# La clé doit déjà exister dans LiteLLM et autoriser le modèle par défaut
+# (créée par litellm-sync-keys.sh, lancé par `deploy.sh n8n`).
+base = overlay["model"]["base_url"].rsplit("/v1", 1)[0]
+try:
+    req = urllib.request.Request(base + "/key/info", headers={"Authorization": f"Bearer {key}"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        allowed = json.load(r).get("info", {}).get("models", [])
+except Exception:
+    allowed = None
+if allowed is None or overlay["model"]["default"] not in allowed:
+    print("key-not-ready")
+    raise SystemExit(0)
+overlay["model"]["api_key"] = key
+live = {}
+if os.path.exists(dst):
+    live = yaml.safe_load(open(dst)) or {}
+merged = {**live, **overlay}
+if merged == live:
+    print("unchanged")
+else:
+    if os.path.exists(dst):
+        bak = f"{dst}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
+        shutil.copy2(dst, bak)
+        os.chmod(bak, 0o600)
+    tmp = dst + ".tmp"
+    with open(tmp, "w") as f:
+        yaml.safe_dump(merged, f, sort_keys=False, allow_unicode=True)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, dst)
+    print("updated")
+PY
+)
+  if [ "$result" = "updated" ]; then
+    echo "  🔑 default/config.yaml: overlay appliqué (model → LiteLLM, api_key from SOPS), sauvegarde .bak-*"
+    echo "  🚀 default: gateway install"
+    hermes gateway install --force < /dev/null 2>&1 | tail -3
+  elif [ "$result" = "key-not-ready" ]; then
+    echo "  ⚠️  default/config.yaml: clé agent-default inconnue de LiteLLM ou sans le modèle par défaut — config live inchangée"
+    echo "     Lancer d'abord : ./scripts/deploy.sh n8n (synchro des clés)"
+  else
+    echo "  ✅ default/config.yaml: déjà à jour"
+  fi
+}
+
 # ── Components ─────────────────────────────────────────────────────
 
 deploy_n8n() {
@@ -474,6 +544,7 @@ with open('$dst_config', 'w') as f:
     write_profile_env "$profile_name"
   done
   upsert_default_profile_env
+  deploy_default_profile_config
 
   echo "✅ Hermes deployed"
 

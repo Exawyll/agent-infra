@@ -1,28 +1,22 @@
-# Hermes Agent config — KVM2 default profile
-# Voir : https://hermes-agent.nousresearch.com/docs
+# Hermes — profil default (~/.hermes/config.yaml) : OVERLAY, pas une config complète.
+#
+# Le fichier déployé est généré et migré par Hermes lui-même (~800 lignes,
+# `_config_version`) : on ne l'écrase jamais. `deploy.sh hermes`
+# (deploy_default_profile_config) remplace UNIQUEMENT les clés de premier niveau
+# présentes ici et laisse tout le reste intact (sauvegarde horodatée avant écriture).
+#
+# Clé : agent-default (SOPS LITELLM_KEY_AGENT_DEFAULT) → rapide + raisonnement.
+# Ne PAS mettre la clé en clair ici : elle est injectée au déploiement.
+#
+# Pas de fallback côté Hermes : LiteLLM gère la chaîne de secours
+# (router_settings.fallbacks dans kvm2/docker/n8n/litellm-config.yaml :
+# rapide → deepseek-flash ; raisonnement → code → deepseek-flash).
 
 model:
-  base_url: https://api.deepseek.com/v1
-  default: deepseek-reasoner
-  fallback_model:
-    model: openrouter/anthropic/claude-sonnet-4
-    provider: openrouter
-  provider: deepseek
+  default: rapide
+  provider: custom
+  base_url: http://127.0.0.1:4000/v1
+  api_key: PLACEHOLDER_REPLACE_LOCALLY
+  api_mode: chat_completions
 
-providers: {}
-fallback_providers:
-  - model: openrouter/deepseek/deepseek-v4-pro
-    provider: openrouter
-
-toolsets:
-  - hermes-cli
-
-agent:
-  max_turns: 150
-  gateway_timeout: 1800
-  api_max_retries: 3
-  tool_use_enforcement: auto
-  task_completion_guidance: true
-  parallel_tool_call_guidance: true
-  environment_probe: true
-  coding_context: auto
+fallback_providers: []

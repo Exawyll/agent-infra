@@ -282,6 +282,7 @@ deploy_default_profile_config() {
   result=$(DEFAULT_KEY="$key" SRC="$src" DST="$dst" python3 - <<'PY'
 import json, os, shutil, time, urllib.request, yaml
 src, dst, key = os.environ["SRC"], os.environ["DST"], os.environ["DEFAULT_KEY"]
+os.umask(0o077)  # sauvegarde et fichier temporaire contiennent la clé en clair
 overlay = yaml.safe_load(open(src)) or {}
 # La clé doit déjà exister dans LiteLLM et autoriser le modèle par défaut
 # (créée par litellm-sync-keys.sh, lancé par `deploy.sh n8n`).
@@ -308,9 +309,11 @@ else:
         shutil.copy2(dst, bak)
         os.chmod(bak, 0o600)
     tmp = dst + ".tmp"
-    with open(tmp, "w") as f:
+    # Créé directement en 0600 : le fichier contient la clé en clair.
+    if os.path.exists(tmp):
+        os.unlink(tmp)
+    with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as f:
         yaml.safe_dump(merged, f, sort_keys=False, allow_unicode=True)
-    os.chmod(tmp, 0o600)
     os.replace(tmp, dst)
     print("updated")
 PY

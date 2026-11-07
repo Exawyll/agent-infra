@@ -302,9 +302,9 @@ deploy_litellm() {
 # la dédup. La seule copie vivante est désormais /local-files/factfulness_log.json.
 # Idempotent : sans effet si tout est déjà propre. Les anciennes copies sont
 # archivées (jamais supprimées sans trace) dans /root/backups/factfulness/.
-# Doit tourner APRÈS deploy_n8n : l'ancien compose n8n montait
-# /var/local/hermes/factfulness_log.json, et un bind vers un fichier absent
-# ferait créer un répertoire à sa place au prochain démarrage du conteneur.
+# Ordre : un fichier encore monté par un conteneur (ancien compose n8n qui montait
+# /var/local/hermes/factfulness_log.json) est laissé en place, car un bind vers un fichier
+# absent ferait créer un répertoire à sa place au prochain démarrage du conteneur.
 cleanup_legacy_factfulness_log() {
   local cron_file="/etc/cron.d/hermes-dedup-sync"
   if [ -f "$cron_file" ]; then
@@ -315,6 +315,13 @@ cleanup_legacy_factfulness_log() {
   local legacy archive_dir="/root/backups/factfulness"
   for legacy in /root/.hermes/factfulness_log.json /var/local/hermes/factfulness_log.json; do
     [ -f "$legacy" ] || continue
+    # Garde-fou d'ordre : si un conteneur monte encore ce fichier (ancien
+    # compose n8n, `deploy.sh hermes` lancé seul), ne pas y toucher.
+    if docker ps -q 2>/dev/null | xargs -r docker inspect -f '{{range .Mounts}}{{println .Source}}{{end}}' 2>/dev/null \
+         | grep -qxF "$legacy"; then
+      echo "  ⚠️  ${legacy} encore monté par un conteneur — non archivé. Lancer d'abord ./scripts/deploy.sh n8n."
+      continue
+    fi
     install -d -m 0700 "$archive_dir"
     mv "$legacy" "${archive_dir}/$(echo "${legacy#/}" | tr '/' '_').$(date +%F_%H%M%S)"
     echo "  🧹 Ancienne copie archivée : ${legacy} → ${archive_dir}/"

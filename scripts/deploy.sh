@@ -297,7 +297,10 @@ moa = overlay.get("moa") or {}
 slots = list(moa.get("reference_models") or []) + [moa.get("aggregator") or {}]
 for preset in (moa.get("presets") or {}).values():
     slots += list(preset.get("reference_models") or []) + [preset.get("aggregator") or {}]
-required |= {sl["model"] for sl in slots if sl.get("provider") == "litellm" and sl.get("model")}
+# Providers nommés qui pointent vers LiteLLM (repérés par base_url, pas par nom).
+proxies = {n for n, p in (overlay.get("providers") or {}).items()
+           if isinstance(p, dict) and p.get("base_url") == litellm_url}
+required |= {sl["model"] for sl in slots if sl.get("provider") in proxies and sl.get("model")}
 base = overlay["model"]["base_url"].rsplit("/v1", 1)[0]
 try:
     req = urllib.request.Request(base + "/key/info", headers={"Authorization": f"Bearer {key}"})

@@ -22,16 +22,20 @@ LITELLM_URL="${LITELLM_URL:-http://127.0.0.1:4000}"
 
 [ -s "$ENV_FILE" ] || { echo "❌ ${ENV_FILE} absent ou vide (déchiffrer SOPS d'abord)"; exit 1; }
 
-# Politique des clés : VARIABLE_SOPS | alias | modèles autorisés | budget max ($)
+# Politique des clés : VARIABLE_SOPS | alias | modèles autorisés | budget ($) | période
+# Le budget se remet à zéro à chaque période (budget_duration LiteLLM) : sans
+# période, max_budget serait un plafond cumulatif à vie — une fois atteint, le
+# profil prendrait des HTTP 400 « Budget has been exceeded » pour toujours, et
+# /key/update ne remet pas `spend` à zéro.
 # Les alias de secours (deepseek-flash, deepseek-pro) n'ont pas besoin d'être
 # listés : LiteLLM applique les fallbacks après l'autorisation du modèle demandé.
 KEY_POLICY="
-LITELLM_KEY_AGENT_VEILLE|agent-veille|rapide|5
-LITELLM_KEY_AGENT_ASSISTANT|agent-assistant|rapide,raisonnement|10
-LITELLM_KEY_AGENT_PRO|agent-pro|pro-rapide,pro-raisonnement|10
-LITELLM_KEY_AGENT_DEV|agent-dev|code,review|20
-LITELLM_KEY_AGENT_WORKER|agent-worker|code,review|20
-LITELLM_KEY_AGENT_REVIEW_B|agent-review-b|review-b|10
+LITELLM_KEY_AGENT_VEILLE|agent-veille|rapide|5|30d
+LITELLM_KEY_AGENT_ASSISTANT|agent-assistant|rapide,raisonnement|10|30d
+LITELLM_KEY_AGENT_PRO|agent-pro|pro-rapide,pro-raisonnement|10|30d
+LITELLM_KEY_AGENT_DEV|agent-dev|code,review|20|30d
+LITELLM_KEY_AGENT_WORKER|agent-worker|code,review|20|30d
+LITELLM_KEY_AGENT_REVIEW_B|agent-review-b|review-b|10|30d
 "
 
 # N'exporte que les variables utiles, sans `source` le .env (valeurs arbitraires).
@@ -75,12 +79,13 @@ else:
 
 errors = 0
 for line in os.environ["KEY_POLICY"].strip().splitlines():
-    var, alias, models, budget = line.split("|")
+    var, alias, models, budget, duration = line.split("|")
     raw = os.environ.get(var, "")
     if not raw:
         print(f"  ⚠️  {alias}: {var} absent de SOPS — ignorée")
         continue
-    policy = {"key_alias": alias, "models": models.split(","), "max_budget": float(budget)}
+    policy = {"key_alias": alias, "models": models.split(","),
+              "max_budget": float(budget), "budget_duration": duration}
     # S'authentifier AVEC la clé (sans paramètre) : elle n'apparaît jamais dans
     # une URL, donc jamais dans les logs d'accès du proxy. 200 = elle existe.
     status, _ = call("GET", "/key/info", bearer=raw)
@@ -91,7 +96,7 @@ for line in os.environ["KEY_POLICY"].strip().splitlines():
         status, _ = call("POST", "/key/generate", {"key": raw, **policy})
         action = "créée"
     if status == 200:
-        print(f"  ✅ {alias}: {action} → {models}")
+        print(f"  ✅ {alias}: {action} → {models} (${budget} / {duration})")
     else:
         print(f"  ❌ {alias}: échec ({action}, HTTP {status})")
         errors += 1

@@ -287,7 +287,13 @@ deploy_n8n() {
   LITELLM_CONFIG_SHA=$(sha256sum litellm-config.yaml | cut -d' ' -f1)
   export LITELLM_CONFIG_SHA
   docker compose --env-file "${_ENV_FILE}" up -d --no-deps --build
-  "${REPO_ROOT}/scripts/litellm-sync-keys.sh" "${_ENV_FILE}"
+  # Non bloquant : la stack est déjà déployée et saine à ce stade ; un échec de
+  # synchro (proxy encore en migration, 5xx transitoire) se rattrape en
+  # relançant le script, il ne doit pas faire passer le déploiement pour raté.
+  if ! "${REPO_ROOT}/scripts/litellm-sync-keys.sh" "${_ENV_FILE}"; then
+    echo "⚠️  Synchro des clés LiteLLM incomplète — les profils concernés prendront des 401/403."
+    echo "   Relancer : ./scripts/decrypt-secrets.sh && ./scripts/litellm-sync-keys.sh && shred -u .env"
+  fi
   echo "✅ n8n stack deployed"
   echo "   Traefik: https://$(grep SUBDOMAIN "${_ENV_FILE}" | head -1 | cut -d= -f2).$(grep DOMAIN_NAME "${_ENV_FILE}" | head -1 | cut -d= -f2)"
 }

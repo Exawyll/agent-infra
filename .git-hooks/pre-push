@@ -1,0 +1,14 @@
+#!/bin/bash
+# Pre-push hook — lance les contrôles locaux (ex-CI GitHub Actions) avant tout push.
+# Installed by: scripts/install-hooks.sh
+# Contournement exceptionnel (déconseillé) : git push --no-verify
+
+remote="$1"
+
+# Les suppressions de branche (git push origin --delete x) n'ont rien à vérifier.
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && exit 0
+done
+
+git fetch -q "$remote" main 2>/dev/null || true
+exec "$(git rev-parse --show-toplevel)/scripts/pre-pr-check.sh" "${remote}/main"

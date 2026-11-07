@@ -25,11 +25,12 @@ sops --encrypt .env > secrets/.env.enc.env   # after editing .env
 # n8n workflows
 ./scripts/import-workflows.sh                # POST n8n-workflows/*.json to a running n8n instance
 
-# Git hooks
-./scripts/install-hooks.sh                   # installs the gitleaks pre-commit hook (scans every commit for secrets)
+# Git hooks + local checks (replace the old GitHub Actions CI)
+./scripts/install-hooks.sh                   # installs pre-commit (gitleaks) + pre-push (runs pre-pr-check.sh)
+./scripts/pre-pr-check.sh                    # gitleaks on the branch, n8n JSON, shellcheck, YAML, Hermes placeholders — must pass before any push
 ```
 
-There is no lint/test/build command — validate changes by running the relevant `deploy.sh` target against a real or throwaway VPS and checking the resulting service (`docker ps`, `systemctl status hermes --no-pager | head -5`).
+There is no test suite. Before pushing, `./scripts/pre-pr-check.sh` must pass (the pre-push hook enforces it). The only GitHub Actions workflow is `.github/workflows/pr-agent.yml`: an automatic PR-Agent review (DeepSeek Flash, direct API, config in `.pr_agent.toml`) posted once when a PR is opened; comment `/review` on the PR to request another pass after new pushes. Wait for that review and address its findings before merging. Don't add other Actions jobs for anything that can run locally — runner minutes are deliberately kept to the review only. Beyond that, validate changes by running the relevant `deploy.sh` target against a real or throwaway VPS and checking the resulting service (`docker ps`, `systemctl status hermes --no-pager | head -5`).
 
 ## Secrets doctrine (non-negotiable, enforced by gitleaks pre-commit hook)
 

@@ -1,0 +1,39 @@
+# Configuration PR-Agent pour agent-infra — surcharge la config globale.
+# La clé API est injectée depuis le secret GitHub DEEPSEEK_API_KEY
+# (voir .github/workflows/pr-agent.yml). Même choix de modèle
+# qu'Exawyll/integration-platform (décision du 2026-11-05).
+
+[config]
+# Principal : deepseek-flash (DeepSeek-V4.1-Flash-1017). Secours : deepseek-v4-pro.
+# L'ancien nom deepseek-v4-flash est retiré par DeepSeek.
+model = "deepseek/deepseek-flash"
+fallback_models = ["deepseek/deepseek-v4-pro"]
+custom_model_max_tokens = 131072
+response_language = "fr-FR"
+
+[pr_reviewer]
+require_security_review = true
+require_tests_review = false
+extra_instructions = """
+Ce repo est de l'infrastructure-as-code pour un VPS (KVM2) : n8n + Hermes + LiteLLM,
+déployés par des scripts shell idempotents, secrets chiffrés par SOPS/age.
+Il n'y a pas de tests automatisés : ne réclame pas de tests unitaires.
+
+Vérifie en priorité, dans cet ordre :
+1. Secrets : aucune valeur de secret en clair (clés API, tokens, mots de passe,
+   en-têtes `Authorization: Bearer ...`, `pinData` n8n). Les profils Hermes
+   versionnés doivent garder `PLACEHOLDER_*` dans `api_key`. Un secret ne doit
+   jamais passer en argument de commande (visible dans /proc et l'historique) :
+   variables d'environnement ou fichiers uniquement.
+2. Idempotence : chaque fonction de scripts/deploy.sh doit pouvoir être relancée
+   sans effet de bord. Tout .env déchiffré doit être shreddé en sortie.
+3. Cohérence de config : un alias de modèle utilisé par un profil Hermes doit
+   exister dans kvm2/docker/n8n/litellm-config.yaml ET être autorisé pour la
+   clé du profil dans scripts/litellm-sync-keys.sh. Les fallbacks LiteLLM
+   doivent être sous `router_settings.fallbacks`.
+4. Dérive repo / serveur : signale tout changement qui suppose un état du
+   serveur non décrit dans le repo (cron manuel, fichier hors repo).
+5. Robustesse bash : `set -euo pipefail`, quoting, compatibilité shellcheck.
+
+Les commentaires et le code peuvent être en français. Réponds en français.
+"""

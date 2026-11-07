@@ -1,23 +1,28 @@
 #!/bin/bash
 # Install git hooks for agent-infra
 # Run after cloning: ./scripts/install-hooks.sh
+#
+#   pre-commit : gitleaks sur le commit en cours
+#   pre-push   : scripts/pre-pr-check.sh (gitleaks de la branche, JSON n8n,
+#                shellcheck, YAML, placeholders Hermes) — remplace l'ancienne
+#                CI GitHub Actions, qui ne garde que la review PR-Agent.
 
-HOOK_SRC=".git-hooks/pre-commit"
-HOOK_DST=".git/hooks/pre-commit"
+for hook in pre-commit pre-push; do
+  src=".git-hooks/${hook}"
+  dst=".git/hooks/${hook}"
+  if [ ! -f "$src" ]; then
+    echo "❌ Source hook not found: $src"
+    exit 1
+  fi
+  cp "$src" "$dst"
+  chmod +x "$dst"
+  echo "✅ ${hook} hook installed: $dst"
+done
 
-if [ ! -f "$HOOK_SRC" ]; then
-  echo "❌ Source hook not found: $HOOK_SRC"
-  exit 1
-fi
-
-cp "$HOOK_SRC" "$HOOK_DST"
-chmod +x "$HOOK_DST"
-echo "✅ Pre-commit hook installed: $HOOK_DST"
-
-# Verify gitleaks is available
-if command -v gitleaks &>/dev/null; then
-  echo "✅ gitleaks found: $(gitleaks version)"
-else
-  echo "⚠️  gitleaks not found — install it before your first commit"
-  echo "   curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.23.3/gitleaks_8.23.3_linux_x64.tar.gz | tar xz -C /usr/local/bin/ gitleaks"
-fi
+for tool in gitleaks shellcheck jq ruby; do
+  if command -v "$tool" &>/dev/null; then
+    echo "✅ ${tool} found"
+  else
+    echo "⚠️  ${tool} not found — pre-pr-check.sh skips its step (brew install ${tool})"
+  fi
+done

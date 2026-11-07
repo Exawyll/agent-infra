@@ -25,8 +25,13 @@ model:
 
 # Provider nommé vers LiteLLM : les slots MOA n'acceptent que {provider, model}
 # (pas de base_url par slot), ils le référencent donc par son nom.
+# Surtout PAS « litellm » : un nom qui correspond à un provider intégré ou à un
+# plugin cède la place à celui-ci. Or KVM2 porte un plugin live-only
+# ~/.hermes/plugins/model-providers/litellm/ (créé le 2026-07-16, attend
+# LITELLM_API_KEY, absente) qui masquait ce provider : MOA échouait avec
+# « Provider 'litellm' is set in config.yaml but no API key was found ».
 providers:
-  litellm:
+  llm-proxy:
     base_url: http://127.0.0.1:4000/v1
     api_key: PLACEHOLDER_REPLACE_LOCALLY
     api_mode: chat_completions
@@ -62,12 +67,12 @@ moa:
     default:
       enabled: true
       reference_models:
-        - provider: litellm
+        - provider: llm-proxy
           model: raisonnement
-        - provider: litellm
+        - provider: llm-proxy
           model: review
       aggregator:
-        provider: litellm
+        provider: llm-proxy
         model: review-b
       reference_temperature: 0.6
       aggregator_temperature: 0.4
@@ -75,12 +80,12 @@ moa:
     code-review:
       enabled: true
       reference_models:
-        - provider: litellm
+        - provider: llm-proxy
           model: code
-        - provider: litellm
+        - provider: llm-proxy
           model: review
       aggregator:
-        provider: litellm
+        provider: llm-proxy
         model: review-b
       reference_temperature: 0.6
       aggregator_temperature: 0.4
@@ -88,12 +93,12 @@ moa:
       max_tokens: 4096
   # Miroir legacy du preset default (lu par les anciennes versions de Hermes).
   reference_models:
-    - provider: litellm
+    - provider: llm-proxy
       model: raisonnement
-    - provider: litellm
+    - provider: llm-proxy
       model: review
   aggregator:
-    provider: litellm
+    provider: llm-proxy
     model: review-b
   reference_temperature: 0.6
   aggregator_temperature: 0.4

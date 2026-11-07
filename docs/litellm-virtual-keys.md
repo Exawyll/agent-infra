@@ -32,7 +32,7 @@ Chaque maillon doit être cohérent : **SOPS → config.yaml → clé virtuelle 
 
 | Profil | Clé virtuelle | Modèles autorisés | Budget | Usage |
 |---|---|---|---|---|
-| default (`~/.hermes/config.yaml`) | `agent-default` (env `LITELLM_KEY_AGENT_DEFAULT`) | `rapide`, `raisonnement` | $10/30j | Agent principal Telegram ; config live gérée par Hermes, `deploy.sh hermes` n'y applique que l'overlay `kvm2/hermes/config.yaml` (`model`, `fallback_providers`) |
+| default (`~/.hermes/config.yaml`) | `agent-default` (env `LITELLM_KEY_AGENT_DEFAULT`) | `rapide`, `raisonnement`, `code`, `review`, `review-b` | $20/30j | Agent principal Telegram : modèle principal (`rapide`), sous-agents (`rapide`) et presets MOA (`raisonnement`/`code`/`review` + agrégateur `review-b`) ; config live gérée par Hermes, `deploy.sh hermes` n'y applique que l'overlay `kvm2/hermes/config.yaml` |
 | `veille` | `agent-veille` | `rapide` | $5/30j | Filtrage articles (webhook n8n) |
 | `dev` | `agent-dev` | `code`, `review` | $20/30j | PR review, dev |
 | `assistant` | `agent-assistant` | `rapide`, `raisonnement` | $10/30j | Quotidien |

@@ -296,7 +296,14 @@ except Exception:
 if allowed is None or overlay["model"]["default"] not in allowed:
     print("key-not-ready")
     raise SystemExit(0)
-overlay["model"]["api_key"] = key
+def inject(node):
+    # Remplace chaque PLACEHOLDER_REPLACE_LOCALLY (model, providers.*) par la clé.
+    if isinstance(node, dict):
+        return {k: inject(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [inject(v) for v in node]
+    return key if node == "PLACEHOLDER_REPLACE_LOCALLY" else node
+overlay = inject(overlay)
 live = {}
 if os.path.exists(dst):
     live = yaml.safe_load(open(dst)) or {}

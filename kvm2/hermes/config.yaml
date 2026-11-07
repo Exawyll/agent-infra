@@ -2,11 +2,15 @@
 #
 # Le fichier déployé est généré et migré par Hermes lui-même (~800 lignes,
 # `_config_version`) : on ne l'écrase jamais. `deploy.sh hermes`
-# (deploy_default_profile_config) remplace UNIQUEMENT les clés de premier niveau (model, fallback_providers, web)
-# présentes ici et laisse tout le reste intact (sauvegarde horodatée avant écriture).
+# (deploy_default_profile_config) remplace UNIQUEMENT les clés de premier niveau présentes ici
+# (model, providers, fallback_providers, delegation, moa, web) et laisse tout le reste intact (sauvegarde horodatée avant écriture).
 #
-# Clé : agent-default (SOPS LITELLM_KEY_AGENT_DEFAULT) → rapide + raisonnement.
-# Ne PAS mettre la clé en clair ici : elle est injectée au déploiement.
+# Clé : agent-default (SOPS LITELLM_KEY_AGENT_DEFAULT), politique dans
+# scripts/litellm-sync-keys.sh. Ne PAS mettre la clé en clair ici : chaque
+# PLACEHOLDER_REPLACE_LOCALLY est remplacé au déploiement.
+#
+# Tous les appels LLM du profil passent par LiteLLM (budget, fallbacks, alias) :
+# modèle principal, sous-agents (delegation) et MOA.
 #
 # Pas de fallback côté Hermes : LiteLLM gère la chaîne de secours
 # (router_settings.fallbacks dans kvm2/docker/n8n/litellm-config.yaml :
@@ -19,7 +23,82 @@ model:
   api_key: PLACEHOLDER_REPLACE_LOCALLY
   api_mode: chat_completions
 
+# Provider nommé vers LiteLLM : les slots MOA n'acceptent que {provider, model}
+# (pas de base_url par slot), ils le référencent donc par son nom.
+providers:
+  litellm:
+    base_url: http://127.0.0.1:4000/v1
+    api_key: PLACEHOLDER_REPLACE_LOCALLY
+    api_mode: chat_completions
+
 fallback_providers: []
+
+# Sous-agents : base_url direct sans api_key → Hermes hérite de la clé du parent
+# (agent-default). Avant : openrouter/deepseek-v4-flash en direct, hors LiteLLM.
+delegation:
+  model: rapide
+  provider: ''
+  base_url: http://127.0.0.1:4000/v1
+  api_key: ''
+  api_mode: chat_completions
+  inherit_mcp_toolsets: true
+  max_iterations: 50
+  child_timeout_seconds: 0
+  reasoning_effort: ''
+  max_concurrent_children: 3
+  max_async_children: 3
+  max_spawn_depth: 1
+  orchestrator_enabled: true
+  subagent_auto_approve: false
+
+# MOA : trois familles distinctes. Références = GPT-6.1 (raisonnement=Sol,
+# code=Terra) + Kimi K3.1 Pro (review) ; agrégateur = Claude Sonnet 5.5 (review-b).
+# Avant : gpt-5.5 via openai-codex (jamais authentifié → échec systématique),
+# claude-sonnet-4 (retiré d'OpenRouter), opus-4.8 en OpenRouter direct.
+moa:
+  default_preset: default
+  active_preset: ''
+  presets:
+    default:
+      enabled: true
+      reference_models:
+        - provider: litellm
+          model: raisonnement
+        - provider: litellm
+          model: review
+      aggregator:
+        provider: litellm
+        model: review-b
+      reference_temperature: 0.6
+      aggregator_temperature: 0.4
+      max_tokens: 4096
+    code-review:
+      enabled: true
+      reference_models:
+        - provider: litellm
+          model: code
+        - provider: litellm
+          model: review
+      aggregator:
+        provider: litellm
+        model: review-b
+      reference_temperature: 0.6
+      aggregator_temperature: 0.4
+      reference_max_tokens: 800
+      max_tokens: 4096
+  # Miroir legacy du preset default (lu par les anciennes versions de Hermes).
+  reference_models:
+    - provider: litellm
+      model: raisonnement
+    - provider: litellm
+      model: review
+  aggregator:
+    provider: litellm
+    model: review-b
+  reference_temperature: 0.6
+  aggregator_temperature: 0.4
+  max_tokens: 4096
+  enabled: true
 
 # Recherche/extraction web via la clé Firecrawl directe (FIRECRAWL_API_KEY,
 # injectée dans ~/.hermes/.env par upsert_default_profile_env). Avec

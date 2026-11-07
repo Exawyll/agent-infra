@@ -104,7 +104,7 @@ agent-infra/
 │   ├── restore.sh               # Restauration complète from scratch
 │   ├── decrypt-secrets.sh       # Déchiffre secrets SOPS
 │   ├── import-workflows.sh      # Import workflows n8n
-│   └── install-hooks.sh         # Installe le hook pre-commit gitleaks
+│   └── install-hooks.sh         # Branche le hook pre-commit (gitleaks + pre-pr-check.sh)
 ├── secrets/
 │   └── .env.enc.env             # .env CHIFFRÉ (SOPS + age)
 ├── .sops.yaml                   # Config SOPS (clé publique age)

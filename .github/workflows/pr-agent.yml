@@ -1,0 +1,55 @@
+name: PR Agent
+
+# Seul workflow GitHub Actions du repo : la review automatique est le seul
+# contrôle qu'on ne peut pas faire en local. gitleaks, JSON n8n, shellcheck,
+# YAML et placeholders Hermes tournent dans scripts/pre-pr-check.sh, lancé à
+# chaque commit par .git-hooks/pre-commit (./scripts/install-hooks.sh) — zéro
+# minute de runner.
+#
+# Modèle sur Exawyll/integration-platform (.github/workflows/pr-agent.yml).
+# Une seule passe automatique par PR : à l'ouverture, ou au passage de
+# brouillon à prête. Les pushs suivants ne relancent pas la review ; pour une
+# nouvelle passe, commenter `/review` (ou `/improve`, `/describe`) sur la PR.
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: pr-agent-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr_agent_job:
+    # pull_request : hors brouillon. issue_comment : seulement une commande
+    # `/...` postée sur une PR (pas sur une issue, pas un commentaire ordinaire).
+    if: >-
+      github.event.sender.type != 'Bot' && (
+        (github.event_name == 'pull_request' && !github.event.pull_request.draft) ||
+        (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+         startsWith(github.event.comment.body, '/'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      issues: write
+      pull-requests: write
+      # read suffit (et est nécessaire) pour charger .pr_agent.toml / CLAUDE.md
+      # et calculer le merge-base — sans elle, échec silencieux en 403
+      # (constaté sur integration-platform le 2026-07-24).
+      contents: read
+    name: Review automatique de la PR (PR-Agent + API DeepSeek directe)
+    steps:
+      - name: PR Agent action step
+        uses: the-pr-agent/pr-agent@v0.39.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK.KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          deepseek__key: ${{ secrets.DEEPSEEK_API_KEY }}
+          github_action_config.auto_review: "true"
+          # Pas de describe automatique : il réécrirait le titre et la
+          # description rédigés pour la PR. Disponible à la demande : /describe
+          github_action_config.auto_describe: "false"
+          github_action_config.auto_improve: "false"

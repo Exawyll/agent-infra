@@ -1,23 +1,35 @@
 #!/bin/bash
 # Install git hooks for agent-infra
 # Run after cloning: ./scripts/install-hooks.sh
+#
+# Un seul hook, .git-hooks/pre-commit : gitleaks sur le commit puis
+# scripts/pre-pr-check.sh (contrôles qui remplacent l'ancienne CI GitHub
+# Actions — seule la review PR-Agent tourne encore sur GitHub).
 
-HOOK_SRC=".git-hooks/pre-commit"
-HOOK_DST=".git/hooks/pre-commit"
+hooks_path="$(git config --get core.hooksPath || true)"
 
-if [ ! -f "$HOOK_SRC" ]; then
-  echo "❌ Source hook not found: $HOOK_SRC"
-  exit 1
-fi
-
-cp "$HOOK_SRC" "$HOOK_DST"
-chmod +x "$HOOK_DST"
-echo "✅ Pre-commit hook installed: $HOOK_DST"
-
-# Verify gitleaks is available
-if command -v gitleaks &>/dev/null; then
-  echo "✅ gitleaks found: $(gitleaks version)"
+if [ -n "$hooks_path" ]; then
+  # Un core.hooksPath (souvent global, ex. hook Aikido) fait ignorer .git/hooks/.
+  # On ne le contourne pas : ce hook global délègue au framework pre-commit,
+  # qui lit .pre-commit-config.yaml et lance .git-hooks/pre-commit.
+  echo "ℹ️  core.hooksPath=${hooks_path} : .git/hooks/ est ignoré par git."
+  if grep -qs "pre-commit-config.yaml" "${hooks_path/#\~/$HOME}/pre-commit"; then
+    echo "✅ Le hook global délègue à pre-commit → .pre-commit-config.yaml sera appliqué."
+  else
+    echo "⚠️  Le hook global ne semble pas appeler le framework pre-commit :"
+    echo "   les contrôles agent-infra ne tourneront pas automatiquement."
+    echo "   Lancer ./scripts/pre-pr-check.sh à la main avant chaque push."
+  fi
 else
-  echo "⚠️  gitleaks not found — install it before your first commit"
-  echo "   curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.23.3/gitleaks_8.23.3_linux_x64.tar.gz | tar xz -C /usr/local/bin/ gitleaks"
+  cp .git-hooks/pre-commit .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  echo "✅ pre-commit hook installed: .git/hooks/pre-commit"
 fi
+
+for tool in gitleaks shellcheck jq ruby; do
+  if command -v "$tool" &>/dev/null; then
+    echo "✅ ${tool} found"
+  else
+    echo "⚠️  ${tool} not found — pre-pr-check.sh skips its step (brew/apt install ${tool})"
+  fi
+done

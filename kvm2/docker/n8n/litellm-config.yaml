@@ -76,6 +76,11 @@ model_list:
       output_cost_per_token: 0.0000012
 
   # ── Profil `pro` : cloisonné, DeepSeek direct uniquement ─────────────
+  # pro-rapide et pro-raisonnement pointent volontairement tous deux sur Flash :
+  # c'est le meilleur modèle DeepSeek disponible (index v5 : Flash 33 contre
+  # V4 Pro 23, pour ~3x moins cher). Le MOA du profil pro (référence = agrégateur
+  # = pro-raisonnement) n'apporte donc pas de second avis — c'était déjà le cas
+  # avant (les deux sur `raisonnement`). Diversifier imposerait V4 Pro, moins bon.
   # Usage professionnel : ses requêtes ne doivent pas partir vers OpenRouter
   # (même règle que l'exclusion de Firecrawl pour ce profil). Ses alias et ses
   # secours restent donc chez DeepSeek.

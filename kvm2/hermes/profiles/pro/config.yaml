@@ -1,10 +1,10 @@
 # Hermes Profile — Pro (Wylliam Professionnel)
 # Provider: custom → LiteLLM (api_key stockée dans le .env du profil)
-# Mode : rapide (défaut) + raisonnement (MOA review)
+# Mode : pro-rapide (défaut) + pro-raisonnement (MOA review) — alias DeepSeek direct uniquement (cloisonnement pro, voir litellm-config.yaml)
 # Ne PAS mettre la clé en clair ici — la copie locale à ~/.hermes/profiles/ contient la vraie clé
 
 model:
-  default: rapide
+  default: pro-rapide
   provider: custom
   base_url: http://127.0.0.1:4000/v1
   api_key: PLACEHOLDER_REPLACE_LOCALLY
@@ -100,10 +100,10 @@ moa:
       enabled: true
       reference_models:
         - provider: custom
-          model: raisonnement
+          model: pro-raisonnement
       aggregator:
         provider: custom
-        model: raisonnement
+        model: pro-raisonnement
       reference_temperature: 0.6
       aggregator_temperature: 0.4
       reference_max_tokens: 800

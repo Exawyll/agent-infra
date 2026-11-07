@@ -1,23 +1,27 @@
 #!/bin/bash
-# Gitleaks pre-commit hook — scan every commit for secrets
-# Installed by: scripts/install-hooks.sh
+# Pre-commit hook agent-infra — référence unique des contrôles locaux.
+#   1. gitleaks sur les fichiers indexés (le commit en cours)
+#   2. scripts/pre-pr-check.sh (gitleaks de la branche, JSON n8n, shellcheck,
+#      YAML, placeholders Hermes) — remplace l'ancienne CI GitHub Actions
+#
+# Branché de deux façons (cf. scripts/install-hooks.sh) :
+#   - poste avec un core.hooksPath global (ex. hook Aikido) : ce hook global
+#     délègue au framework pre-commit, qui lance ce script via .pre-commit-config.yaml
+#   - sinon : copié tel quel dans .git/hooks/pre-commit
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 echo "🔍 Scanning for secrets with gitleaks..."
-
 if ! command -v gitleaks &>/dev/null; then
-  echo "⚠️  gitleaks not found — install it first: goreleaser or brew install gitleaks"
+  echo "⚠️  gitleaks not found — install it first: brew install gitleaks"
   exit 1
 fi
 
-gitleaks git --pre-commit --config "$PWD/.gitleaks.toml" --verbose 2>&1
-STATUS=$?
-
-if [ $STATUS -ne 0 ]; then
+if ! gitleaks git --pre-commit --staged --config "${REPO_ROOT}/.gitleaks.toml" --redact --no-banner 2>&1; then
   echo ""
   echo "❌ SECRET DÉTECTÉ — commit rejeté."
   echo "   Si c'est un faux positif, édite .gitleaks.toml pour l'ajouter à l'allowlist."
   exit 1
 fi
+echo "✅ Aucun secret détecté dans le commit."
 
-echo "✅ Aucun secret détecté — commit autorisé."
-exit 0
+exec "${REPO_ROOT}/scripts/pre-pr-check.sh"

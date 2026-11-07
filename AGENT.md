@@ -38,7 +38,7 @@ Des commandes de diagnostic anodines (`docker compose config`, `docker inspect -
 
 - `git status` relu en entier (pas juste `git add -A` en aveugle)
 - Aucun fichier `.env*` en staging hors `.env.example`/`.env.template`/`*.enc.env`
-- Un hook pre-commit anti-secrets est actif — vérifier **les deux emplacements possibles** : `.git/hooks/pre-commit` (installé via `./scripts/install-hooks.sh`) OU `git config core.hooksPath` (hook global personnel, ex. Aikido). Si aucun des deux n'est actif, lancer `./scripts/install-hooks.sh` avant le premier commit.
+- Le hook `.git-hooks/pre-commit` (gitleaks + `scripts/pre-pr-check.sh`) doit tourner à chaque commit. Deux branchements possibles : copié dans `.git/hooks/pre-commit`, OU appelé via `.pre-commit-config.yaml` quand un `core.hooksPath` global (ex. Aikido) délègue au framework pre-commit. `./scripts/install-hooks.sh` détecte le cas et l'indique. En cas de doute, lancer `./scripts/pre-pr-check.sh` à la main avant de pousser.
 
 ## Règle n°7 — procédure en cas de secret exposé
 

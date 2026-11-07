@@ -7,7 +7,7 @@
 # (.github/workflows/pr-agent.yml), qu'on ne peut pas faire tourner en local.
 #
 # Usage : ./scripts/pre-pr-check.sh [base]     (défaut : origin/main)
-# Lancé automatiquement par le hook pre-push (./scripts/install-hooks.sh).
+# Lancé automatiquement à chaque commit par .git-hooks/pre-commit (cf. scripts/install-hooks.sh).
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

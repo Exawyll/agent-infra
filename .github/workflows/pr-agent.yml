@@ -2,8 +2,9 @@ name: PR Agent
 
 # Seul workflow GitHub Actions du repo : la review automatique est le seul
 # contrôle qu'on ne peut pas faire en local. gitleaks, JSON n8n, shellcheck,
-# YAML et placeholders Hermes tournent dans scripts/pre-pr-check.sh, lancé par
-# le hook pre-push (./scripts/install-hooks.sh) — zéro minute de runner.
+# YAML et placeholders Hermes tournent dans scripts/pre-pr-check.sh, lancé à
+# chaque commit par .git-hooks/pre-commit (./scripts/install-hooks.sh) — zéro
+# minute de runner.
 #
 # Modèle sur Exawyll/integration-platform (.github/workflows/pr-agent.yml).
 # Une seule passe automatique par PR : à l'ouverture, ou au passage de

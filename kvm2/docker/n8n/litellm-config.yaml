@@ -1,54 +1,115 @@
-# LiteLLM Proxy Config — Migration API DeepSeek directe
-# rapide → V4 Flash (DeepSeek direct)
-# code   → V4 Pro (DeepSeek direct, fallback → rapide)
-# review → GLM-5.2 (OpenRouter — second avis distinct de `code`, remplace Kimi K3 trop lent/cher)
-# review-b → Claude Sonnet 5 (OpenRouter — 2e reviewer Gate 2 Symphony Phase 3, distinct de `review`)
-# raisonnement → V4 Pro (DeepSeek direct)
+# LiteLLM Proxy Config — config LIVE (montée par le service `litellm` de la stack n8n)
+#
+# Choix des modèles revu le 2026-11-07 sur données fraîches :
+#   - Artificial Analysis Intelligence Index v5 (score / coût pour faire tourner l'index)
+#   - prix OpenRouter lus via https://openrouter.ai/api/v1/models
+#   - doc DeepSeek (api-docs.deepseek.com) : `deepseek-flash` = V4.1 Flash 1017 ;
+#     l'ancien ID `deepseek-v4-flash` est retiré et redirigé.
+#
+# Alias          → modèle                          index v5 / coût   prix $/M in/out
+# rapide         → Claude Haiku 5.5 (OpenRouter)    35 xhigh / $0.25   0.10 / 0.50
+# code           → GPT-6.1 Terra (OpenRouter)       42-45   / $0.26-0.40  1 / 5
+# raisonnement   → GPT-6.1 Sol (OpenRouter)         46-50   / $0.36-0.59  2 / 10
+# review         → Kimi K3.1 Pro (OpenRouter)       46      / $3.68    2 / 10   (meilleur open-weights)
+# review-b       → Claude Sonnet 5.5 (OpenRouter)   42 high / $1.64    2 / 10
+# deepseek-flash → DeepSeek V4.1 Flash (direct)     33 max  / $0.60    0.30 / 1.20 (heures pleines)
+# pro-rapide / pro-raisonnement → DeepSeek direct uniquement (voir plus bas)
+#
+# Pourquoi DeepSeek V4 Pro n'est plus utilisé en principal : index v5 = 23 pour
+# $1.77, soit moins bon ET ~3x plus cher que V4.1 Flash.
+#
+# Familles volontairement distinctes : code (OpenAI) ≠ review (Moonshot) ≠
+# review-b (Anthropic), pour que les reviews MOA / Symphony Gate 2 restent des
+# seconds avis indépendants.
 
 model_list:
-  # Rapide : tâches simples, veille — V4 Flash direct
+  # Rapide : tâches simples, veille, assistant au quotidien
   - model_name: rapide
     litellm_params:
-      model: deepseek/deepseek-v4-flash
-      api_key: os.environ/DEEPSEEK_API_KEY
-      input_cost_per_token: 0.00000014
-      output_cost_per_token: 0.00000028
+      model: openrouter/anthropic/claude-haiku-5.5
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.0000001
+      output_cost_per_token: 0.0000005
 
-  # Code : génération et debugging — V4 Pro direct
+  # Code : génération et debugging (dev, worker)
   - model_name: code
     litellm_params:
-      model: deepseek/deepseek-v4-pro
-      api_key: os.environ/DEEPSEEK_API_KEY
-      input_cost_per_token: 0.000000435
-      output_cost_per_token: 0.00000087
-    fallbacks:
-      - rapide
-
-  # Review : code review + consolidation — GLM-5.2 (OpenRouter)
-  - model_name: review
-    litellm_params:
-      model: openrouter/z-ai/glm-5.2
+      model: openrouter/openai/gpt-6.1-terra
       api_key: os.environ/OPENROUTER_API_KEY
-      input_cost_per_token: 0.00000025
-      output_cost_per_token: 0.00000079
+      input_cost_per_token: 0.000001
+      output_cost_per_token: 0.000005
 
-  # Review B : 2e avis Gate 2 Symphony Phase 3 — Claude Sonnet 5 (OpenRouter),
-  # volontairement un provider/famille différente de `review` (GLM) pour un
-  # vrai second avis indépendant. Pricing OpenRouter au 2026-08 : $2/M in, $10/M out.
-  - model_name: review-b
+  # Raisonnement : planification, architecture, MOA (assistant)
+  - model_name: raisonnement
     litellm_params:
-      model: openrouter/anthropic/claude-sonnet-5
+      model: openrouter/openai/gpt-6.1-sol
       api_key: os.environ/OPENROUTER_API_KEY
       input_cost_per_token: 0.000002
       output_cost_per_token: 0.00001
 
-  # Raisonnement : planification, architecture — V4 Pro direct
-  - model_name: raisonnement
+  # Review : code review + consolidation MOA (dev, worker, Symphony Gate 2)
+  - model_name: review
+    litellm_params:
+      model: openrouter/moonshotai/kimi-k3.1-pro
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.000002
+      output_cost_per_token: 0.00001
+
+  # Review B : 2e reviewer Gate 2 Symphony Phase 3 (famille différente de `review`)
+  - model_name: review-b
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-5.5
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.000002
+      output_cost_per_token: 0.00001
+
+  # Secours commun : DeepSeek en direct, fournisseur différent d'OpenRouter
+  - model_name: deepseek-flash
+    litellm_params:
+      model: deepseek/deepseek-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+      input_cost_per_token: 0.0000003
+      output_cost_per_token: 0.0000012
+
+  # ── Profil `pro` : cloisonné, DeepSeek direct uniquement ─────────────
+  # Usage professionnel : ses requêtes ne doivent pas partir vers OpenRouter
+  # (même règle que l'exclusion de Firecrawl pour ce profil). Ses alias et ses
+  # secours restent donc chez DeepSeek.
+  - model_name: pro-rapide
+    litellm_params:
+      model: deepseek/deepseek-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+      input_cost_per_token: 0.0000003
+      output_cost_per_token: 0.0000012
+
+  - model_name: pro-raisonnement
+    litellm_params:
+      model: deepseek/deepseek-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+      input_cost_per_token: 0.0000003
+      output_cost_per_token: 0.0000012
+
+  # Secours de `pro` : autre modèle chez le même fournisseur (couvre une panne
+  # propre au modèle Flash sans sortir de DeepSeek).
+  - model_name: pro-secours
     litellm_params:
       model: deepseek/deepseek-v4-pro
       api_key: os.environ/DEEPSEEK_API_KEY
-      input_cost_per_token: 0.000000435
-      output_cost_per_token: 0.00000087
+      input_cost_per_token: 0.00000132
+      output_cost_per_token: 0.00000396
+
+# Les fallbacks DOIVENT être ici : une clé `fallbacks:` sous une entrée de
+# model_list est ignorée silencieusement (c'est pour ça que les logs Hermes
+# affichaient `Fallbacks=None` le 2026-11-07, quand DeepSeek a renvoyé des 500).
+router_settings:
+  fallbacks:
+    - rapide: [deepseek-flash]
+    - code: [deepseek-flash]
+    - raisonnement: [code, deepseek-flash]
+    - review: [deepseek-flash]
+    - review-b: [deepseek-flash]
+    - pro-rapide: [pro-secours]
+    - pro-raisonnement: [pro-secours]
 
 litellm_settings:
   drop_params: true

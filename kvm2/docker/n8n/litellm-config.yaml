@@ -13,6 +13,7 @@
 # review         → Kimi K3.1 Pro (OpenRouter)       46      / $3.68    2 / 10   (meilleur open-weights)
 # review-b       → Claude Sonnet 5.5 (OpenRouter)   42 high / $1.64    2 / 10
 # deepseek-flash → DeepSeek V4.1 Flash (direct)     33 max  / $0.60    0.30 / 1.20 (heures pleines)
+# deepseek-pro   → DeepSeek V4 Pro (direct)         23 max  / $1.77    secours n°2 (pro, review-b)
 # pro-rapide / pro-raisonnement → DeepSeek direct uniquement (voir plus bas)
 #
 # Pourquoi DeepSeek V4 Pro n'est plus utilisé en principal : index v5 = 23 pour
@@ -20,7 +21,10 @@
 #
 # Familles volontairement distinctes : code (OpenAI) ≠ review (Moonshot) ≠
 # review-b (Anthropic), pour que les reviews MOA / Symphony Gate 2 restent des
-# seconds avis indépendants.
+# seconds avis indépendants. En cas de panne OpenRouter, les deux reviewers
+# basculent sur DEUX modèles DeepSeek distincts (review → Flash, review-b → V4 Pro) :
+# même fournisseur, mais pas un reviewer dupliqué. Compromis accepté faute de
+# second fournisseur direct (la clé Anthropic directe de SOPS est invalide au 2026-11-07).
 
 model_list:
   # Rapide : tâches simples, veille, assistant au quotidien
@@ -89,9 +93,10 @@ model_list:
       input_cost_per_token: 0.0000003
       output_cost_per_token: 0.0000012
 
-  # Secours de `pro` : autre modèle chez le même fournisseur (couvre une panne
-  # propre au modèle Flash sans sortir de DeepSeek).
-  - model_name: pro-secours
+  # Secours n°2, DeepSeek direct : autre modèle que Flash. Sert de secours à
+  # `pro-*` (couvre une panne propre à Flash sans sortir de DeepSeek) et à
+  # `review-b` (pour ne pas retomber sur le même modèle que `review`).
+  - model_name: deepseek-pro
     litellm_params:
       model: deepseek/deepseek-v4-pro
       api_key: os.environ/DEEPSEEK_API_KEY
@@ -107,9 +112,9 @@ router_settings:
     - code: [deepseek-flash]
     - raisonnement: [code, deepseek-flash]
     - review: [deepseek-flash]
-    - review-b: [deepseek-flash]
-    - pro-rapide: [pro-secours]
-    - pro-raisonnement: [pro-secours]
+    - review-b: [deepseek-pro]
+    - pro-rapide: [deepseek-pro]
+    - pro-raisonnement: [deepseek-pro]
 
 litellm_settings:
   drop_params: true

@@ -23,7 +23,7 @@ LITELLM_URL="${LITELLM_URL:-http://127.0.0.1:4000}"
 [ -s "$ENV_FILE" ] || { echo "❌ ${ENV_FILE} absent ou vide (déchiffrer SOPS d'abord)"; exit 1; }
 
 # Politique des clés : VARIABLE_SOPS | alias | modèles autorisés | budget max ($)
-# Les alias de secours (deepseek-flash, pro-secours) n'ont pas besoin d'être
+# Les alias de secours (deepseek-flash, deepseek-pro) n'ont pas besoin d'être
 # listés : LiteLLM applique les fallbacks après l'autorisation du modèle demandé.
 KEY_POLICY="
 LITELLM_KEY_AGENT_VEILLE|agent-veille|rapide|5
@@ -36,7 +36,8 @@ LITELLM_KEY_AGENT_REVIEW_B|agent-review-b|review-b|10
 
 # N'exporte que les variables utiles, sans `source` le .env (valeurs arbitraires).
 export LITELLM_URL KEY_POLICY
-while IFS= read -r line; do
+# `|| [ -n "$line" ]` : traite aussi une dernière ligne sans retour à la ligne final.
+while IFS= read -r line || [ -n "$line" ]; do
   case "$line" in ''|'#'*) continue ;; esac
   name="${line%%=*}"
   case "$name" in LITELLM_MASTER_KEY|LITELLM_KEY_AGENT_*) export "${name}=${line#*=}" ;; esac

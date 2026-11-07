@@ -36,6 +36,9 @@ services:
       # Les clés virtuelles sont recréées depuis SOPS par
       # scripts/litellm-sync-keys.sh (appelé par deploy.sh n8n).
       - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD}@litellm-postgres:5432/litellm_v2
+      # Empreinte de litellm-config.yaml calculée par deploy.sh : la changer
+      # force la recréation du conteneur, donc la prise en compte de la config.
+      - LITELLM_CONFIG_SHA=${LITELLM_CONFIG_SHA:-}
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}

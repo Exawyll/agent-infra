@@ -308,6 +308,15 @@ live = {}
 if os.path.exists(dst):
     live = yaml.safe_load(open(dst)) or {}
 merged = {**live, **overlay}
+# Fusion superficielle voulue (le repo fait foi pour ces blocs), mais jamais
+# silencieuse : signaler les sous-clés live qui vont disparaître (noms seuls,
+# jamais les valeurs) pour qu'un ajout fait en live soit rapatrié dans le repo.
+import sys
+for k, v in overlay.items():
+    if isinstance(v, dict) and isinstance(live.get(k), dict):
+        lost = sorted(set(live[k]) - set(v))
+        if lost:
+            print(f"  ⚠️  default/config.yaml: {k}.{{{', '.join(lost)}}} présent en live, absent de l'overlay → supprimé (rapatrier dans kvm2/hermes/config.yaml si voulu)", file=sys.stderr)
 if merged == live:
     print("unchanged")
 else:

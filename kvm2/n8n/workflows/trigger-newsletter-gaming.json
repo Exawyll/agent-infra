@@ -28,37 +28,17 @@
       }
     },
     {
-      "id": "http-2",
+      "id": "code-2",
       "name": "POST gaming webhook",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         300,
         0
       ],
       "parameters": {
-        "method": "POST",
-        "url": "http://100.106.174.46:8644/webhooks/newsletter-gaming",
-        "authentication": "none",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-Hub-Signature-256",
-              "value": "={{ $env.HERMES_WEBHOOK_SIGNATURE }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{}",
-        "options": {
-          "continueOnFail": true
-        }
+        "mode": "runOnceForAllItems",
+        "jsCode": "try {\n  const crypto = require('crypto');\n  const body = JSON.stringify({});\n  const signature = 'sha256=' + crypto.createHmac('sha256', $env.WEBHOOK_SECRET || '').update(body).digest('hex');\n  const res = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://172.18.0.1:8644/webhooks/newsletter-gaming',\n    headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': signature },\n    body\n  });\n  return [{ json: { statusCode: (res && res.statusCode) || 200 } }];\n} catch (e) {\n  return [{ json: { statusCode: (e && (e.statusCode || (e.response && e.response.status))) || 500, error: e.message || String(e) } }];\n}"
       }
     },
     {
